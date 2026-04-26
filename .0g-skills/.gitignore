@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test project (contains .env with keys)
+test-project/
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# CI temp files
+ci/.tmp/
+
+# Examples
+examples/**/node_modules/
+examples/**/.env
+
+# Logs
+*.log
+npm-debug.log*

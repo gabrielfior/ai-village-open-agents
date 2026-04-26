@@ -1,0 +1,61 @@
+{
+  "name": "0G Agent Skills",
+  "slug": "0g-agent-skills",
+  "version": "1.0.0",
+  "description": "AI agent skills for building on the 0G decentralized AI operating system — Storage, Compute, and Chain",
+  "author": "0G Foundation",
+  "license": "MIT",
+  "repository": "https://github.com/0gfoundation/agent-skills-0g",
+  "categories": ["web3", "blockchain", "ai", "storage", "compute"],
+  "entryPoint": "CLAUDE.md",
+  "skills": {
+    "count": 15,
+    "categories": [
+      {
+        "name": "storage",
+        "skills": ["upload-file", "download-file", "kv-store", "merkle-verification"]
+      },
+      {
+        "name": "compute",
+        "skills": [
+          "streaming-chat",
+          "text-to-image",
+          "speech-to-text",
+          "account-management",
+          "fine-tuning",
+          "provider-discovery"
+        ]
+      },
+      {
+        "name": "chain",
+        "skills": ["deploy-contract", "interact-contract", "scaffold-project"]
+      },
+      {
+        "name": "cross-layer",
+        "skills": ["storage-plus-chain", "compute-plus-storage"]
+      }
+    ]
+  },
+  "sdks": [
+    {
+      "name": "@0glabs/0g-ts-sdk",
+      "version": "^0.8.0",
+      "purpose": "Storage operations"
+    },
+    {
+      "name": "@0glabs/0g-serving-broker",
+      "version": "^0.6.5",
+      "purpose": "Compute operations"
+    },
+    {
+      "name": "ethers",
+      "version": "^6.13.0",
+      "purpose": "Chain interaction"
+    }
+  ],
+  "compatibility": {
+    "claude-code": true,
+    "cursor": true,
+    "github-copilot": true
+  }
+}

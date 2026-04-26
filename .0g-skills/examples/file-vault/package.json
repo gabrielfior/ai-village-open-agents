@@ -1,0 +1,22 @@
+{
+  "name": "0g-file-vault",
+  "version": "1.0.0",
+  "description": "Upload, download, and verify files on 0G decentralized storage",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "upload": "npx tsx src/upload.ts",
+    "download": "npx tsx src/download.ts",
+    "verify": "npx tsx src/verify.ts"
+  },
+  "dependencies": {
+    "@0glabs/0g-ts-sdk": "^0.3.3",
+    "dotenv": "^16.4.0",
+    "ethers": "^6.13.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "@types/node": "^20.11.0"
+  }
+}

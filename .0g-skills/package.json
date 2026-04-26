@@ -1,0 +1,53 @@
+{
+  "name": "agent-skills-0g",
+  "version": "1.0.0",
+  "description": "AI agent skills for building on the 0G decentralized AI operating system — Storage, Compute, and Chain",
+  "author": "0G Foundation",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0gfoundation/agent-skills-0g"
+  },
+  "keywords": [
+    "0g",
+    "agent-skills",
+    "ai-assistant",
+    "claude-code",
+    "cursor",
+    "copilot",
+    "web3",
+    "decentralized-storage",
+    "decentralized-compute",
+    "blockchain"
+  ],
+  "scripts": {
+    "format": "prettier --write '**/*.md'",
+    "format:check": "prettier --check '**/*.md'",
+    "ci:extract": "npx tsx ci/extract-code-blocks.ts",
+    "ci:versions": "npx tsx ci/validate-sdk-versions.ts",
+    "ci:lint": "npx tsx ci/lint-critical-rules.ts",
+    "ci:all": "npm run ci:extract && npm run ci:versions && npm run ci:lint"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "prettier": "^3.2.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  },
+  "agentSkills": {
+    "name": "0G Agent Skills",
+    "version": "1.0.0",
+    "categories": [
+      "storage",
+      "compute",
+      "chain",
+      "cross-layer"
+    ],
+    "skillCount": 14,
+    "entryPoints": {
+      "claude-code": "CLAUDE.md",
+      "cursor": "setups/cursor/README.md",
+      "copilot": "setups/copilot/README.md"
+    }
+  }
+}

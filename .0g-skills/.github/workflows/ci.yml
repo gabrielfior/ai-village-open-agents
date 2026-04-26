@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  format:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+
+  lint-skills:
+    name: Lint Skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install SDK type stubs
+        run: npm install --no-save @0glabs/0g-ts-sdk@^0.3.3 @0glabs/0g-serving-broker@^0.6.5 ethers@^6.13.0
+      - name: Extract and type-check code blocks
+        run: npm run ci:extract
+      - name: Validate SDK versions
+        run: npm run ci:versions
+      - name: Lint critical rules
+        run: npm run ci:lint
+
+  build-examples:
+    name: Build Examples
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        example: [file-vault, ai-chatbot, nft-with-metadata, ai-image-gallery]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install and type-check ${{ matrix.example }}
+        working-directory: examples/${{ matrix.example }}
+        run: |
+          npm install
+          npx tsc --noEmit
