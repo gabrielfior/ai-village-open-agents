@@ -56,6 +56,7 @@ def recv_raw(bridge_base: str) -> tuple[str, bytes] | None:
 def load_gossip_sub(repo_root: Path) -> tuple[type, type]:
     """Load GossipSub from axl/examples/python-client/gossipsub/gossipsub.py."""
     import importlib.util
+    import sys
 
     path = (
         repo_root
@@ -65,10 +66,13 @@ def load_gossip_sub(repo_root: Path) -> tuple[type, type]:
         / "gossipsub"
         / "gossipsub.py"
     )
-    spec = importlib.util.spec_from_file_location("axl_gossipsub", path)
+    name = "axl_gossipsub"
+    spec = importlib.util.spec_from_file_location(name, path)
     if not spec or not spec.loader:
         raise ImportError(f"Cannot load gossipsub from {path}")
     mod = importlib.util.module_from_spec(spec)
+    # Required before exec_module: @dataclass resolves cls.__module__ via sys.modules.
+    sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod.GossipSub, mod.GossipConfig
 
