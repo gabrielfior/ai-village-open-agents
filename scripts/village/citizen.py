@@ -252,6 +252,7 @@ def main() -> int:
         mode="w", suffix=".json", delete=False, dir=cwd, prefix="citizen-node-"
     ) as tmp:
         cfg_path = Path(tmp.name)
+    proc: subprocess.Popen | None = None
     try:
         write_node_config(
             cfg_path,
@@ -271,12 +272,13 @@ def main() -> int:
         def cleanup() -> None:
             if args.keep_node:
                 return
-            if proc.poll() is None:
-                proc.send_signal(signal.SIGTERM)
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
+            if proc is None or proc.poll() is not None:
+                return
+            proc.send_signal(signal.SIGTERM)
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
 
         topo = wait_topology(bridge)
         my_id = str(topo["our_public_key"]).strip().lower()
