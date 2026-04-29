@@ -475,11 +475,14 @@ class Orchestrator:
                     "run_id": st.run_id,
                     "current_epoch": st.current_epoch,
                     "phase": st.phase,
+                    "max_epochs": st.max_epochs,
                     "policy": dict(st.policy),
                     "balances": dict(st.balances),
                     "enrolled": sorted(st.enrolled),
                     "actions_per_epoch": st.actions_per_epoch,
                     "slots_used": dict(st.slots_used),
+                    "earn_used": dict(st.earn_used),
+                    "epoch_complete": sorted(st.epoch_complete),
                     "gini_history": list(st.gini_history),
                 }
             )
