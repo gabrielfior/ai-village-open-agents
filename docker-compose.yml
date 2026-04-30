@@ -58,3 +58,19 @@ services:
     depends_on:
       village-infra:
         condition: service_healthy
+
+  # ── Simulation UI ────────────────────────────────────────────────
+  # React TypeScript app.  Reads gini_timeseries.json from the runs
+  # directory and displays Gini chart + actions per citizen per epoch.
+  # ─────────────────────────────────────────────────────────────────
+  village-ui:
+    build:
+      context: ./scripts/village/ui
+    container_name: village-ui
+    ports:
+      - "8080:80"
+    volumes:
+      - ./scripts/village/runs:/data/runs:ro
+    depends_on:
+      village-infra:
+        condition: service_healthy
