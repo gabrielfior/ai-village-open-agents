@@ -44,10 +44,15 @@ export default function App() {
 
   return (
     <div style={container}>
-      <h1 style={{ margin: '0 0 8px 0' }}>AI Village Simulation</h1>
+      <div style={headerBar}>
+        <span style={{ fontSize: 20, fontWeight: 700 }}>AI Village Simulation</span>
+        <span style={{ fontSize: 12, color: '#666' }}>simulation viewer</span>
+      </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ marginRight: 8, fontWeight: 600 }}>Run:</label>
+      <div style={toolbar}>
+        <label style={{ marginRight: 8, fontWeight: 600, color: '#aaa', fontSize: 13 }}>
+          Run:
+        </label>
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
@@ -63,19 +68,26 @@ export default function App() {
         <button onClick={() => loadRun(selected)} style={btnStyle}>
           Reload
         </button>
+        {loading && <span style={{ marginLeft: 12, color: '#888', fontSize: 12 }}>Loading…</span>}
       </div>
 
-      {error && <div style={{ color: '#f77', marginBottom: 12 }}>{error}</div>}
-
-      {loading && <div style={{ color: '#888' }}>Loading…</div>}
+      {error && (
+        <div style={errorBar}>
+          {error}
+        </div>
+      )}
 
       {data && (
         <>
-          <div style={{ marginBottom: 12, fontSize: 13, color: '#aaa' }}>
-            citizens: {data.citizen_peer_ids.length} | actions/epoch:{' '}
-            {data.actions_per_epoch} | epochs: {data.max_epochs}
+          <div style={metaBar}>
+            <span>{data.citizen_peer_ids.length} citizen(s)</span>
+            <span>{data.actions_per_epoch} actions/epoch</span>
+            <span>{data.max_epochs} epochs</span>
+            <span style={{ color: '#888' }}>run: {data.run_id}</span>
           </div>
-          <GiniChart data={data} />
+          <div style={{ background: '#111', borderRadius: 8, padding: 16, marginBottom: 24 }}>
+            <GiniChart data={data} width={700} height={280} />
+          </div>
           <ActionsTable data={data} />
         </>
       )}
@@ -84,29 +96,70 @@ export default function App() {
 }
 
 const container: React.CSSProperties = {
-  maxWidth: 800,
-  margin: '32px auto',
-  padding: '0 16px',
-  fontFamily: 'system-ui, sans-serif',
-  color: '#eee',
+  maxWidth: 850,
+  margin: '0 auto',
+  padding: '0 16px 64px',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  color: '#e0e0e0',
+  background: '#0d0d0d',
+  minHeight: '100vh',
+};
+
+const headerBar: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 12,
+  padding: '20px 0 12px',
+  borderBottom: '1px solid #222',
+  marginBottom: 16,
+};
+
+const toolbar: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  marginBottom: 16,
 };
 
 const selectStyle: React.CSSProperties = {
-  padding: '4px 8px',
-  fontSize: 14,
-  borderRadius: 4,
-  border: '1px solid #555',
-  background: '#222',
-  color: '#eee',
+  padding: '6px 10px',
+  fontSize: 13,
+  borderRadius: 6,
+  border: '1px solid #444',
+  background: '#1a1a1a',
+  color: '#e0e0e0',
   marginRight: 8,
+  outline: 'none',
+  cursor: 'pointer',
+  minWidth: 180,
 };
 
 const btnStyle: React.CSSProperties = {
-  padding: '4px 12px',
-  fontSize: 14,
-  borderRadius: 4,
+  padding: '6px 14px',
+  fontSize: 13,
+  borderRadius: 6,
   border: '1px solid #555',
-  background: '#333',
-  color: '#eee',
+  background: '#2a2a2a',
+  color: '#ccc',
   cursor: 'pointer',
+  fontWeight: 500,
+};
+
+const errorBar: React.CSSProperties = {
+  color: '#ef9a9a',
+  marginBottom: 16,
+  padding: '10px 14px',
+  background: '#2a1010',
+  borderRadius: 6,
+  border: '1px solid #5a2020',
+  fontSize: 13,
+};
+
+const metaBar: React.CSSProperties = {
+  display: 'flex',
+  gap: 16,
+  marginBottom: 20,
+  fontSize: 12,
+  color: '#666',
+  padding: '8px 0',
+  borderBottom: '1px solid #222',
 };

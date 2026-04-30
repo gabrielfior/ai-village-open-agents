@@ -36,8 +36,10 @@ export default function GiniChart({ data, width = 600, height = 250 }: Props) {
 
   return (
     <div>
-      <h2>Gini coefficient</h2>
-      <svg width={width} height={height} style={{ background: '#1a1a1a', borderRadius: 6 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#ccc' }}>
+        Gini coefficient
+      </div>
+      <svg width={width} height={height} style={{ background: '#0a0a0a', borderRadius: 6 }}>
         {/* grid lines */}
         {yLabels.map((v, i) => (
           <g key={i}>

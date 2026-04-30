@@ -17,6 +17,7 @@ export interface ActionEntry {
   want?: number;
   accepted?: boolean;
   outcome?: string;
+  offer_id?: string;
 }
 
 export interface GiniTimeseries {
