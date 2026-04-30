@@ -1,0 +1,22 @@
+# Simplified infra image: Yellow Pages MCP + Orchestrator
+# No MCP Router, no Town Hall MCP, no AXL integrations.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY scripts/village/requirements.txt /tmp/
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+COPY scripts/village/yellow_pages_mcp.py \
+     scripts/village/orchestrator.py \
+     scripts/village/start-infra.sh \
+     /app/
+
+RUN mkdir -p /app/runs
+
+EXPOSE 9105 9200
+
+ENTRYPOINT ["./start-infra.sh"]

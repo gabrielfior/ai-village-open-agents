@@ -1,68 +1,129 @@
-# AI Village (multi-node AXL) — runbook
+# AI Village — runbook
 
-Village **v0** uses: Yellow Pages MCP, **Town Hall MCP** (audit log), **orchestrator** HTTP API, **GossipSub** for policy propagation over AXL, and **citizen** processes using a **random brain** (no LLM).
+## Simplified topology
 
-## Port matrix (example, local demo)
+The original setup required 4+ Python services (MCP router, Yellow Pages MCP,
+Town Hall MCP, Orchestrator) and 4+ AXL node processes.  This has been
+**simplified to 1 Python container + host-managed AXL nodes**:
 
-| Service | Port |
-|--------|------|
-| MCP router | 9003 |
-| Yellow Pages FastMCP | 9105 |
-| Town Hall audit FastMCP | 9106 |
-| Orchestrator | 9200 |
-| Yellow Pages AXL node API | 9002 |
-| Town hall AXL API | e.g. 9004 |
-| Citizen A | 9012 |
-| Citizen B | 9013 |
+| Before | After |
+|--------|-------|
+| MCP Router (port 9003) | **Eliminated** — citizens use `--mcp-http-url` |
+| Yellow Pages MCP (9105) | **Kept** — runs in Docker |
+| Town Hall MCP (9106) | **Eliminated** — optional audit, orchestrator writes snapshots |
+| Orchestrator (9200) | **Kept** — runs in Docker |
+| AXL nodes (4 processes) | **Kept** — spawned on host by `run_simulation.py` |
 
-Each process uses its own AXL `node` binary with a distinct PEM and `--api-port`.
+**Result:** one Docker container with 2 Python processes (Yellow Pages +
+Orchestrator). AXL nodes are spawned on the host as before.
 
-## Startup order
+---
 
-1. **MCP router** (from `axl/integrations`):  
-   `python -m mcp_routing.mcp_router --port 9003`
+## Quick start (recommended)
 
-2. **Yellow Pages MCP**:  
-   `python yellow_pages_mcp.py --listen-port 9105 --roster ./yellow-pages-roster.json --register-router http://127.0.0.1:9003`
+```bash
+# One command — starts Docker infra, waits for health, runs simulation
+./launch_village.sh
 
-3. **Town Hall MCP** (audit / UI):  
-   `python town_hall_mcp.py --listen-port 9106 --register-router http://127.0.0.1:9003`
+# Just the simple standalone simulation (no Docker, no AXL)
+./launch_village.sh --simple
+```
 
-4. **Orchestrator**:  
-   `python orchestrator.py --listen-port 9200 --audit-mcp-url http://127.0.0.1:9106/mcp`
+Or step by step:
 
-   Smoke test (must return JSON with `service: village-orchestrator`):  
-   `curl -s http://127.0.0.1:9200/v1/health`
+```bash
+# 1. Start infrastructure (Yellow Pages + Orchestrator)
+docker compose up -d
 
-   Probe several ports:  
-   `uv run python scripts/village/check_village_ports.py --orchestrator http://127.0.0.1:9200 --bridge http://127.0.0.1:9002`
+# 2. Verify both are healthy
+curl http://localhost:9200/v1/health
+curl -sS -X POST http://localhost:9105/mcp \
+  -H 'Content-Type: application/json' -H 'Accept: application/json' \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"0.1"}},"id":0}'
 
-5. **AXL nodes** — one for Yellow Pages host, one for town hall, one per citizen, each peering into the same mesh (`tls://...` from your setup). Each Yellow Pages node config must set `router_addr` / `router_port` if you call directory over the bridge.
+# 3. Run simulation (spawns AXL nodes + citizens on host)
+python scripts/village/run_simulation.py --config scripts/village/simulation.example.json
 
-6. **Create run** (after citizens will join, or pre-seed citizen ids):  
-   `curl -s -X POST http://127.0.0.1:9200/v1/run/create -H 'Content-Type: application/json' -d '{"run_id":"demo1","max_epochs":3,"actions_per_epoch":5,"initial_balance":100,"citizens":["<peer_a>","<peer_b>"]}'`
+# 4. Run again with different parameters (infrastructure stays up)
+python scripts/village/run_simulation.py --config scripts/village/simulation2.json
 
-7. **Register** mayor + citizens on Yellow Pages (`register_agent` via each node’s bridge — see `agent_register_axl.py` / `citizen.py`).
+# 5. Stop infrastructure
+docker compose down
+```
 
-8. **Start citizens** (each terminal):  
-   `python citizen.py --node-binary …/axl/node --pem …/private-a.pem --yellow-pages-peer-id $YP_PEER --peer tls://… --api-port 9012 --orchestrator http://127.0.0.1:9200 --run-id demo1 --seed 1`
+---
 
-9. **Town hall driver** (town hall node’s bridge):  
-   `python town_hall.py --bridge http://127.0.0.1:9004 --yellow-pages-peer-id $YP_PEER --orchestrator http://127.0.0.1:9200 --run-id demo1 --max-epochs 3`
+## What changed & why
+
+| Change | Reason |
+|--------|--------|
+| **MCP Router removed** | `citizen.py` has `--mcp-http-url` for direct HTTP to Yellow Pages; no AXL bridge MCP routing needed |
+| **Town Hall MCP removed** | It's an optional audit log; orchestrator writes snapshot JSON files directly |
+| **Yellow Pages + Orchestrator combined in one container** | Both are Python, same dependencies, run side-by-side |
+| **AXL nodes stay on host** | `run_simulation.py` already manages them as subprocesses; containerizing would require refactoring |
+| **`town_hall.py` now accepts `--mcp-http-url`** | Same direct-HTTP pattern as `citizen.py`, bypasses AXL bridge MCP routing |
+| **`mcp_router.py` accepts `--host`** | Enables `0.0.0.0` binding for Docker (backward compatible) |
+
+---
+
+## Starting a new simulation
+
+The infrastructure (Yellow Pages + Orchestrator) is **persistent** across runs.
+To start a new simulation:
+
+```bash
+# Just run the simulation driver again with a different config
+python scripts/village/run_simulation.py --config scripts/village/simulation2.json
+```
+
+To **reset all state** (orchestrator is in-memory):
+
+```bash
+docker compose restart
+```
+
+---
+
+## Docker Compose reference
+
+```bash
+docker compose up -d            # Start infra in background
+docker compose logs -f          # Tail logs
+docker compose restart          # Restart (clears in-memory orchestrator state)
+docker compose down             # Stop and remove
+```
+
+The compose file exposes:
+
+| Port | Service |
+|------|---------|
+| 9105 | Yellow Pages MCP (direct HTTP) |
+| 9200 | Orchestrator HTTP API |
+
+---
+
+## Port matrix (current)
+
+| Service | Port | Runs in |
+|---------|------|---------|
+| Yellow Pages MCP | 9105 | Docker |
+| Orchestrator | 9200 | Docker |
+| Yellow Pages AXL node | 9002 | Host (by `run_simulation.py`) |
+| Town hall AXL node | 9004 | Host |
+| Citizen A AXL node | 9012 | Host |
+| Citizen B AXL node | 9013 | Host |
+
+---
 
 ## Artifacts
 
-- **Orchestrator** writes `scripts/village/runs/<run_id>/manifest.json` and `snapshot_epoch_*.json`.
-- **Town Hall MCP** writes `scripts/village/town-hall-data/<run_id>/events.jsonl` and epoch summaries (query via MCP tools `get_timeline`, `query_actions`).
+- **Orchestrator** writes `scripts/village/runs/<run_id>/manifest.json`,
+  `snapshot_epoch_*.json`, and `gini_timeseries.json`.
+
+---
 
 ## Tests
 
-From repo root (stdlib only):
-
-`python3 -m unittest discover -s tests -p "test_village_fiscal.py" -v`
-
-## Notes
-
-- Policy is delivered on Gossip topic `village/<run_id>/policy`.
-- Bilateral trades use **raw JSON** envelopes on AXL (`village` / `v1` / `trade_offer` / `trade_accept`).
-- UI consumers should read **Town Hall MCP**, not the orchestrator, for citizen-facing timelines.
+```bash
+python3 -m unittest discover -s tests -p "test_village_fiscal.py" -v
+```

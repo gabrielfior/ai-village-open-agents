@@ -27,15 +27,6 @@ from typing import Any
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.panel import Panel
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TaskProgressColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
 from rich.table import Table
 from rich.traceback import install as rich_traceback_install
 
@@ -90,11 +81,22 @@ def _get_json(url: str) -> dict[str, Any]:
         return json.loads(resp.read().decode())
 
 
-def _mcp_url(base: str, yellow_pages_peer: str) -> str:
-    return f"{base.rstrip('/')}/mcp/{yellow_pages_peer}/directory"
+def _mcp_endpoint(base: str, yellow_pages_peer: str, *, mcp_http_url: str | None = None) -> str:
+    """Direct HTTP URL or AXL bridge MCP path (same pattern as citizen.py)."""
+    u = (mcp_http_url or "").strip()
+    if u:
+        return u.rstrip("/")
+    pid = yellow_pages_peer.strip().lower()
+    return f"{base.rstrip('/')}/mcp/{pid}/directory"
 
 
-def mcp_init(base: str, yellow_pages_peer: str) -> str:
+def mcp_init(
+    base: str,
+    yellow_pages_peer: str,
+    *,
+    mcp_http_url: str | None = None,
+) -> str:
+    url = _mcp_endpoint(base, yellow_pages_peer, mcp_http_url=mcp_http_url)
     body = json.dumps(
         {
             "jsonrpc": "2.0",
@@ -108,7 +110,7 @@ def mcp_init(base: str, yellow_pages_peer: str) -> str:
         }
     ).encode()
     req = urllib.request.Request(
-        _mcp_url(base, yellow_pages_peer),
+        url,
         data=body,
         method="POST",
         headers={"Content-Type": "application/json", "Accept": "application/json"},
@@ -132,8 +134,11 @@ def mcp_tools_call(
     name: str,
     arguments: dict[str, Any],
     req_id: int,
+    *,
+    mcp_http_url: str | None = None,
 ) -> dict[str, Any]:
     LOG.debug("MCP tools/call %s %s", name, arguments)
+    url = _mcp_endpoint(base, yellow_pages_peer, mcp_http_url=mcp_http_url)
     body = json.dumps(
         {
             "jsonrpc": "2.0",
@@ -143,7 +148,7 @@ def mcp_tools_call(
         }
     ).encode()
     req = urllib.request.Request(
-        _mcp_url(base, yellow_pages_peer),
+        url,
         data=body,
         method="POST",
         headers={
@@ -176,7 +181,11 @@ def _mcp_text_result(result: dict[str, Any]) -> str:
 
 
 def list_citizen_peer_ids(
-    bridge: str, yellow_pages_peer: str, session: str
+    bridge: str,
+    yellow_pages_peer: str,
+    session: str,
+    *,
+    mcp_http_url: str | None = None,
 ) -> list[str]:
     raw = mcp_tools_call(
         bridge,
@@ -185,6 +194,7 @@ def list_citizen_peer_ids(
         "list_peer_ids",
         {"role_filter": "citizen"},
         1,
+        mcp_http_url=mcp_http_url,
     )
     txt = _mcp_text_result(raw).strip()
     if not txt:
@@ -234,8 +244,9 @@ def run_loop(args: argparse.Namespace) -> int:
         )
     )
 
-    LOG.info("MCP initialize (Yellow Pages)…")
-    session = mcp_init(args.bridge, args.yellow_pages_peer_id)
+    mcp_http = getattr(args, "mcp_http_url", None) or None
+    LOG.info("MCP initialize (Yellow Pages)… %s", "direct" if mcp_http else "via bridge")
+    session = mcp_init(args.bridge, args.yellow_pages_peer_id, mcp_http_url=mcp_http)
 
     LOG.info("Loading GossipSub…")
     GossipSub, GossipConfig = load_gossip_sub(_ROOT)
@@ -245,7 +256,11 @@ def run_loop(args: argparse.Namespace) -> int:
     gs.subscribe(topic)
     LOG.info("GossipSub subscribed topic [cyan]%s[/cyan]", topic)
 
-    peers = set(list_citizen_peer_ids(args.bridge, args.yellow_pages_peer_id, session))
+    peers = set(
+        list_citizen_peer_ids(
+            args.bridge, args.yellow_pages_peer_id, session, mcp_http_url=mcp_http
+        )
+    )
     peers.add(my_id)
     for p in peers:
         gs.add_peer(p)
@@ -279,72 +294,98 @@ def run_loop(args: argparse.Namespace) -> int:
         msg_id = gs.publish(topic, payload)
         LOG.info("Gossip published policy msg_id=%s bytes=%d", msg_id, len(payload))
 
+        t_open = time.time()
+        LOG.info(
+            "Epoch %s opened; polling orchestrator every ~80ms until epoch_quorum_ready "
+            "(all registered peers in epoch_complete) or %.0fs timeout — no Rich live progress.",
+            epoch,
+            args.epoch_timeout_sec,
+        )
+
         deadline = time.time() + args.epoch_timeout_sec
-        wait_start = time.time()
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(bar_width=40),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-            console=console,
-            transient=False,
-        ) as progress:
-            wait_task = progress.add_task(
-                "[yellow]Waiting for citizens (epoch_complete)…[/yellow]",
-                total=args.epoch_timeout_sec,
+        last_hb = 0.0
+        exit_reason = ""
+        quorum = False
+        while time.time() < deadline:
+            try:
+                st = _get_json(f"{orch}/v1/state?run_id={args.run_id}")
+            except (urllib.error.URLError, json.JSONDecodeError) as e:
+                LOG.debug("state poll error: %s", e)
+                time.sleep(0.2)
+                continue
+
+            phase = str(st.get("phase", "")).strip()
+            enrolled = st.get("enrolled") or []
+            eco = st.get("epoch_complete") or []
+            slots_used = st.get("slots_used") or {}
+
+            ready = st.get("epoch_quorum_ready")
+            if ready is None:
+                en_low = {str(x).strip().lower() for x in enrolled}
+                done_low = {str(x).strip().lower() for x in eco}
+                quorum = bool(en_low and en_low <= done_low)
+            else:
+                quorum = bool(ready)
+
+            n_en = len(enrolled)
+            n_done = len(eco)
+            n_ap = int(st.get("actions_per_epoch", 5))
+            slot_cap = n_ap * max(1, n_en)
+            total_used = sum(int(slots_used.get(p, 0)) for p in enrolled)
+
+            now = time.time()
+            if now - last_hb >= 2.0:
+                en_low = {str(x).strip().lower() for x in enrolled}
+                done_low = {str(x).strip().lower() for x in eco}
+                pending = sorted(en_low - done_low)
+                LOG.info(
+                    "[epoch %s] +%.2fs | phase=%s | quorum_ready=%s | "
+                    "epoch_complete %d/%d registered | action slots %d/%d%s",
+                    epoch,
+                    now - t_open,
+                    phase,
+                    quorum,
+                    n_done,
+                    n_en,
+                    total_used,
+                    slot_cap,
+                    f" | pending: {[p[:16]+'…' for p in pending[:4]]}" if pending else "",
+                )
+                last_hb = now
+
+            if LOG.isEnabledFor(logging.DEBUG):
+                LOG.debug(
+                    "state poll: phase=%s quorum=%s enrolled=%s epoch_complete=%s",
+                    phase,
+                    quorum,
+                    enrolled,
+                    eco,
+                )
+
+            if phase != "action":
+                LOG.info("Leaving wait (phase=%s).", phase)
+                exit_reason = f"phase={phase}"
+                break
+            if quorum:
+                LOG.info(
+                    "[epoch %s] Quorum: every registered peer has epoch_complete "
+                    "(orchestrator epoch_quorum_ready) after %.2fs",
+                    epoch,
+                    now - t_open,
+                )
+                exit_reason = "quorum"
+                break
+
+            gs.tick()
+            time.sleep(0.08)
+
+        if not exit_reason:
+            LOG.warning(
+                "Epoch %s: %.0fs timeout — forcing /epoch/close (last quorum_ready=%s)",
+                epoch,
+                args.epoch_timeout_sec,
+                quorum,
             )
-            while time.time() < deadline:
-                gs.tick()
-                elapsed = time.time() - wait_start
-                try:
-                    st = _get_json(f"{orch}/v1/state?run_id={args.run_id}")
-                except (urllib.error.URLError, json.JSONDecodeError) as e:
-                    LOG.debug("state poll error: %s", e)
-                    elapsed = time.time() - wait_start
-                    progress.update(
-                        wait_task,
-                        completed=min(elapsed, args.epoch_timeout_sec),
-                        description=f"[red]state poll error[/red] {e!s:.60}",
-                    )
-                    time.sleep(0.2)
-                    continue
-
-                phase = st.get("phase")
-                enrolled = st.get("enrolled") or []
-                done = set(st.get("epoch_complete") or [])
-                slots_used = st.get("slots_used") or {}
-
-                desc = (
-                    f"[cyan]phase[/cyan]={phase}  "
-                    f"[green]epoch_complete[/green] {len(done)}/{len(enrolled)}  "
-                    f"[dim]{len(enrolled)} enrolled[/dim]"
-                )
-                progress.update(wait_task, description=desc)
-                progress.update(
-                    wait_task,
-                    completed=min(elapsed, args.epoch_timeout_sec),
-                )
-
-                if LOG.isEnabledFor(logging.DEBUG):
-                    LOG.debug(
-                        "state: phase=%s enrolled=%s done=%s slots_used=%s",
-                        phase,
-                        enrolled,
-                        sorted(done),
-                        slots_used,
-                    )
-
-                if phase != "action":
-                    LOG.info("Left action phase (phase=%s); closing wait loop.", phase)
-                    progress.update(wait_task, completed=args.epoch_timeout_sec)
-                    break
-                if len(enrolled) > 0 and done.issuperset(set(enrolled)):
-                    LOG.info("All %d citizens reported epoch_complete.", len(enrolled))
-                    progress.update(wait_task, completed=args.epoch_timeout_sec)
-                    break
-                time.sleep(0.3)
 
         LOG.info("POST /v1/epoch/close …")
         snap = _json_req(f"{orch}/v1/epoch/close", {"run_id": args.run_id})
@@ -385,6 +426,11 @@ def main() -> int:
     p.add_argument("--initial-tax", type=float, default=0.1)
     p.add_argument("--initial-ubi", type=int, default=5)
     p.add_argument("--epoch-timeout-sec", type=float, default=120.0)
+    p.add_argument(
+        "--mcp-http-url",
+        default="",
+        help="Direct Yellow Pages HTTP URL (bypasses AXL bridge MCP routing)",
+    )
     p.add_argument(
         "-v",
         "--verbose",

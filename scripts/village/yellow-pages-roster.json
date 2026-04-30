@@ -1,0 +1,45 @@
+{
+  "agents": {
+    "aeee586651447f67d96016d44121d56d874de0b3e0fbc4327c7d4f65557210d6": {
+      "peer_id": "aeee586651447f67d96016d44121d56d874de0b3e0fbc4327c7d4f65557210d6",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 2.3208382973073625,
+      "last_seen": "2026-04-30T19:10:31.583767+00:00"
+    },
+    "e7985225688bfb16220de859c384d50744e50a32afd0cf9803ead508be152b7c": {
+      "peer_id": "e7985225688bfb16220de859c384d50744e50a32afd0cf9803ead508be152b7c",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 2.2657150565360515,
+      "last_seen": "2026-04-30T19:10:31.597341+00:00"
+    },
+    "56add54d16d0535cf426654c800f4f7e921acc3b5ec9e8ce733142d861dabdc1": {
+      "peer_id": "56add54d16d0535cf426654c800f4f7e921acc3b5ec9e8ce733142d861dabdc1",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 4.267121397646204,
+      "last_seen": "2026-04-30T19:34:43.213361+00:00"
+    },
+    "a0c4b0fac0154fd48a9a47e670c663161c039e747a964347325d3aecc9bd1207": {
+      "peer_id": "a0c4b0fac0154fd48a9a47e670c663161c039e747a964347325d3aecc9bd1207",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 0.2793663197033105,
+      "last_seen": "2026-04-30T19:34:43.226096+00:00"
+    }
+  },
+  "updated_at": "2026-04-30T19:34:43.226114+00:00"
+}
