@@ -16,12 +16,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+from rich.console import Console
+from rich.logging import RichHandler
+from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+from rich.table import Table
+from rich.traceback import install as rich_traceback_install
 
 _ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS = Path(__file__).resolve().parent
@@ -35,16 +51,40 @@ from village_axl import (  # noqa: E402
     policy_topic,
 )
 
+LOG = logging.getLogger("town_hall")
+
+
+def _setup_logging(*, verbose: bool) -> None:
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[
+            RichHandler(
+                rich_tracebacks=True,
+                show_path=False,
+                tracebacks_show_locals=verbose,
+                markup=True,
+            )
+        ],
+        force=True,
+    )
+
 
 def _json_req(url: str, body: dict[str, Any]) -> dict[str, Any]:
+    LOG.debug("POST %s …", url)
     data = json.dumps(body).encode()
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
     with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.loads(resp.read().decode())
+        out = json.loads(resp.read().decode())
+    LOG.debug("POST %s -> ok", url)
+    return out
 
 
 def _get_json(url: str) -> dict[str, Any]:
+    LOG.debug("GET %s", url)
     req = urllib.request.Request(url, method="GET")
     with urllib.request.urlopen(req, timeout=60) as resp:
         return json.loads(resp.read().decode())
@@ -93,6 +133,7 @@ def mcp_tools_call(
     arguments: dict[str, Any],
     req_id: int,
 ) -> dict[str, Any]:
+    LOG.debug("MCP tools/call %s %s", name, arguments)
     body = json.dumps(
         {
             "jsonrpc": "2.0",
@@ -165,26 +206,50 @@ def next_policy(prev: dict[str, Any], gini: float) -> dict[str, Any]:
     return {"wealth_tax_rate": round(tax, 4), "ubi": ubi}
 
 
+def _balances_table(title: str, balances: dict[str, Any]) -> Table:
+    t = Table(title=title, show_header=True, header_style="bold cyan")
+    t.add_column("peer_id", style="dim", max_width=24)
+    t.add_column("balance", justify="right")
+    for pid in sorted(balances.keys()):
+        t.add_row(pid[:20] + "…" if len(pid) > 20 else pid, str(balances[pid]))
+    return t
+
+
 def run_loop(args: argparse.Namespace) -> int:
+    console = Console()
+    rich_traceback_install(show_locals=args.verbose)
+
     topo = get_topology(args.bridge)
     if not topo:
-        print("topology unavailable; is the AXL node up?", file=sys.stderr)
+        console.print("[red]topology unavailable[/red]; is the AXL node up?", style="bold")
         return 1
     my_id = str(topo.get("our_public_key", "")).strip().lower()
-    print("town hall bridge peer_id:", my_id)
+    LOG.info("Town hall bridge peer_id: %s", my_id)
+    console.print(
+        Panel(
+            f"[bold]peer_id[/bold] {my_id}\n[bold]run_id[/bold] {args.run_id}\n"
+            f"[bold]orchestrator[/bold] {args.orchestrator}\n[bold]bridge[/bold] {args.bridge}",
+            title="[bold green]Town Hall[/bold green]",
+            border_style="green",
+        )
+    )
 
+    LOG.info("MCP initialize (Yellow Pages)…")
     session = mcp_init(args.bridge, args.yellow_pages_peer_id)
 
+    LOG.info("Loading GossipSub…")
     GossipSub, GossipConfig = load_gossip_sub(_ROOT)
     send_fn, recv_fn = bridge_gossip_fns(args.bridge)
     gs = GossipSub(GossipConfig(), my_id, send_fn, recv_fn)
     topic = policy_topic(args.run_id)
     gs.subscribe(topic)
+    LOG.info("GossipSub subscribed topic [cyan]%s[/cyan]", topic)
 
     peers = set(list_citizen_peer_ids(args.bridge, args.yellow_pages_peer_id, session))
     peers.add(my_id)
     for p in peers:
         gs.add_peer(p)
+    LOG.info("Gossip mesh peers: %d (%s…)", len(peers), ", ".join(list(peers)[:3]))
 
     orch = args.orchestrator.rstrip("/")
     policy: dict[str, Any] = {
@@ -193,8 +258,15 @@ def run_loop(args: argparse.Namespace) -> int:
     }
 
     for epoch in range(args.max_epochs):
-        print(f"--- epoch {epoch} policy={policy} ---")
-        _json_req(f"{orch}/v1/epoch/open", {"run_id": args.run_id, "epoch": epoch, "policy": policy})
+        console.rule(f"[bold blue]Epoch {epoch} / {args.max_epochs - 1}[/bold blue]")
+        LOG.info("Policy: %s", policy)
+        console.print_json(data=policy, indent=None)
+
+        LOG.info("POST /v1/epoch/open …")
+        _json_req(
+            f"{orch}/v1/epoch/open",
+            {"run_id": args.run_id, "epoch": epoch, "policy": policy},
+        )
 
         envelope = {
             "run_id": args.run_id,
@@ -204,30 +276,101 @@ def run_loop(args: argparse.Namespace) -> int:
             "deadline_ts": time.time() + args.epoch_timeout_sec,
         }
         payload = json.dumps(envelope, separators=(",", ":")).encode("utf-8")
-        gs.publish(topic, payload)
+        msg_id = gs.publish(topic, payload)
+        LOG.info("Gossip published policy msg_id=%s bytes=%d", msg_id, len(payload))
 
         deadline = time.time() + args.epoch_timeout_sec
-        while time.time() < deadline:
-            gs.tick()
-            try:
-                st = _get_json(f"{orch}/v1/state?run_id={args.run_id}")
-            except (urllib.error.URLError, json.JSONDecodeError):
-                time.sleep(0.2)
-                continue
-            if st.get("phase") != "action":
-                break
-            enrolled = st.get("enrolled") or []
-            done = set(st.get("epoch_complete") or [])
-            if len(enrolled) > 0 and done.issuperset(set(enrolled)):
-                break
-            time.sleep(0.3)
+        wait_start = time.time()
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(bar_width=40),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+            transient=False,
+        ) as progress:
+            wait_task = progress.add_task(
+                "[yellow]Waiting for citizens (epoch_complete)…[/yellow]",
+                total=args.epoch_timeout_sec,
+            )
+            while time.time() < deadline:
+                gs.tick()
+                elapsed = time.time() - wait_start
+                try:
+                    st = _get_json(f"{orch}/v1/state?run_id={args.run_id}")
+                except (urllib.error.URLError, json.JSONDecodeError) as e:
+                    LOG.debug("state poll error: %s", e)
+                    elapsed = time.time() - wait_start
+                    progress.update(
+                        wait_task,
+                        completed=min(elapsed, args.epoch_timeout_sec),
+                        description=f"[red]state poll error[/red] {e!s:.60}",
+                    )
+                    time.sleep(0.2)
+                    continue
 
+                phase = st.get("phase")
+                enrolled = st.get("enrolled") or []
+                done = set(st.get("epoch_complete") or [])
+                slots_used = st.get("slots_used") or {}
+
+                desc = (
+                    f"[cyan]phase[/cyan]={phase}  "
+                    f"[green]epoch_complete[/green] {len(done)}/{len(enrolled)}  "
+                    f"[dim]{len(enrolled)} enrolled[/dim]"
+                )
+                progress.update(wait_task, description=desc)
+                progress.update(
+                    wait_task,
+                    completed=min(elapsed, args.epoch_timeout_sec),
+                )
+
+                if LOG.isEnabledFor(logging.DEBUG):
+                    LOG.debug(
+                        "state: phase=%s enrolled=%s done=%s slots_used=%s",
+                        phase,
+                        enrolled,
+                        sorted(done),
+                        slots_used,
+                    )
+
+                if phase != "action":
+                    LOG.info("Left action phase (phase=%s); closing wait loop.", phase)
+                    progress.update(wait_task, completed=args.epoch_timeout_sec)
+                    break
+                if len(enrolled) > 0 and done.issuperset(set(enrolled)):
+                    LOG.info("All %d citizens reported epoch_complete.", len(enrolled))
+                    progress.update(wait_task, completed=args.epoch_timeout_sec)
+                    break
+                time.sleep(0.3)
+
+        LOG.info("POST /v1/epoch/close …")
         snap = _json_req(f"{orch}/v1/epoch/close", {"run_id": args.run_id})
         gini = float(snap.get("gini", 0.0))
-        print("closed epoch", epoch, "gini=", gini, "balances=", snap.get("balances"))
-        policy = next_policy(policy, gini)
+        balances = snap.get("balances") or {}
 
-    print("town hall finished")
+        console.print(
+            f"[bold green]Epoch {epoch} closed[/bold green]  "
+            f"[bold]Gini[/bold] [magenta]{gini:.4f}[/magenta]"
+        )
+        console.print(_balances_table(f"Balances after epoch {epoch}", balances))
+
+        stats = gs.get_stats()
+        LOG.info(
+            "Gossip stats: published=%s received_unique=%d total_rx=%d",
+            stats.get("published_msg_ids"),
+            len(stats.get("received_msg_ids", [])),
+            stats.get("total_received", 0),
+        )
+        if args.verbose:
+            console.print_json(data=stats, indent=2)
+
+        policy = next_policy(policy, gini)
+        LOG.info("Next epoch policy (preview): %s", policy)
+
+    console.print(Panel("[bold green]Town hall finished[/bold green]", border_style="green"))
     return 0
 
 
@@ -242,7 +385,14 @@ def main() -> int:
     p.add_argument("--initial-tax", type=float, default=0.1)
     p.add_argument("--initial-ubi", type=int, default=5)
     p.add_argument("--epoch-timeout-sec", type=float, default=120.0)
+    p.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="DEBUG logs + JSON gossip stats each epoch",
+    )
     args = p.parse_args()
+    _setup_logging(verbose=args.verbose)
     return run_loop(args)
 
 
