@@ -174,6 +174,7 @@ class CitizenAgent:
         self.exchange = exchange
         self.earn_cap = earn_cap
         self.brain = CitizenBrain(seed, peer_id)
+        self.actions_log: list[dict[str, Any]] = []
 
     # ── Yellow Pages helpers ─────────────────────────────────────
     def register_yp(self) -> None:
@@ -234,9 +235,11 @@ class CitizenAgent:
         )
 
     def run_epoch(self, run_id: str, epoch: int, n_actions: int) -> None:
+        self.actions_log.clear()
         st = self.state(run_id)
         bal = int(st.get("balances", {}).get(self.peer_id, 0))
 
+        self._log("dummy", {"why": "always_on_epoch_start"})
         self.do_action(run_id, {"type": "dummy", "why": "always_on_epoch_start"})
 
         peer_candidates = self.list_peers_yp()
@@ -257,6 +260,7 @@ class CitizenAgent:
             # pending commits (counterparty accepted our trade_prepare)
             if pending_commits:
                 oid = pending_commits.pop(0)
+                self._log("trade_commit", {"offer_id": oid})
                 self.do_action(run_id, {"type": "trade_commit", "offer_id": oid})
                 continue
 
@@ -286,11 +290,13 @@ class CitizenAgent:
             kind = action_def["type"]
 
             if kind == "noop":
+                self._log("noop", {})
                 self.do_action(run_id, action_def)
 
             elif kind == "earn":
                 take = min(action_def["amount"], earn_remaining)
                 if take > 0:
+                    self._log("earn", {"amount": take})
                     out = self.do_action(run_id, {"type": "earn", "amount": take})
                     if out.get("decision") == "applied":
                         earn_used += take
@@ -312,10 +318,22 @@ class CitizenAgent:
                     accepted = self.exchange.make_offer(
                         oid, self.peer_id, cp, give, want
                     )
+                    self._log("trade_offer", {
+                        "counterparty": cp, "give": give, "want": want,
+                        "accepted": accepted,
+                    })
                     if accepted:
                         pending_commits.append(oid)
 
         self.epoch_complete(run_id)
+
+    def _log(self, kind: str, extra: dict[str, Any]) -> None:
+        self.actions_log.append({
+            "citizen": self.peer_id,
+            "slot": len(self.actions_log) + 1,
+            "action": kind,
+            **extra,
+        })
 
 
 # ── main ──────────────────────────────────────────────────────────
@@ -451,12 +469,20 @@ def main() -> int:
         balances = snap.get("balances", {})
         pre_tax = snap.get("pre_tax_balances", {})
 
+        actions_log: list[dict[str, Any]] = []
+        for a in agents:
+            actions_log.extend(a.actions_log)
+
         print(f"pre-tax : {pre_tax}")
         print(f"post-tax: {balances}")
         print(f"Gini    : {gini:.4f}")
+        print(f"actions : {len(actions_log)} total")
+
+        snap_with_log = dict(snap)
+        snap_with_log["actions_log"] = actions_log
 
         snap_path = run_dir / f"snapshot_epoch_{epoch:04d}.json"
-        snap_path.write_text(json.dumps(snap, indent=2) + "\n", encoding="utf-8")
+        snap_path.write_text(json.dumps(snap_with_log, indent=2) + "\n", encoding="utf-8")
 
         series.append({
             "epoch": epoch,
@@ -464,6 +490,7 @@ def main() -> int:
             "policy_applied": dict(policy),
             "balances": balances,
             "pre_tax_balances": pre_tax,
+            "actions_log": actions_log,
         })
         policy = next_policy(policy, gini)
 
