@@ -488,8 +488,13 @@ class Orchestrator:
             )
 
 
+async def handle_health(_request: web.Request) -> web.Response:
+    return web.json_response({"ok": True, "service": "village-orchestrator"})
+
+
 def build_app(orch: Orchestrator) -> web.Application:
     app = web.Application()
+    app.router.add_get("/v1/health", handle_health)
     app.router.add_post("/v1/run/create", orch.handle_create_run)
     app.router.add_post("/v1/run/join", orch.handle_join_run)
     app.router.add_post("/v1/epoch/open", orch.handle_open_epoch)

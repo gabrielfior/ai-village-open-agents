@@ -31,6 +31,12 @@ Each process uses its own AXL `node` binary with a distinct PEM and `--api-port`
 4. **Orchestrator**:  
    `python orchestrator.py --listen-port 9200 --audit-mcp-url http://127.0.0.1:9106/mcp`
 
+   Smoke test (must return JSON with `service: village-orchestrator`):  
+   `curl -s http://127.0.0.1:9200/v1/health`
+
+   Probe several ports:  
+   `uv run python scripts/village/check_village_ports.py --orchestrator http://127.0.0.1:9200 --bridge http://127.0.0.1:9002`
+
 5. **AXL nodes** — one for Yellow Pages host, one for town hall, one per citizen, each peering into the same mesh (`tls://...` from your setup). Each Yellow Pages node config must set `router_addr` / `router_port` if you call directory over the bridge.
 
 6. **Create run** (after citizens will join, or pre-seed citizen ids):  
