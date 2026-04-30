@@ -42,52 +42,52 @@ export default function App() {
     if (selected) loadRun(selected);
   }, [selected, loadRun]);
 
+  const [chartWidth, setChartWidth] = useState(800);
+  const chartRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) setChartWidth(node.clientWidth - 32);
+  }, []);
+
   return (
     <div style={container}>
       <div style={headerBar}>
-        <span style={{ fontSize: 20, fontWeight: 700 }}>AI Village Simulation</span>
-        <span style={{ fontSize: 12, color: '#666' }}>simulation viewer</span>
-      </div>
-
-      <div style={toolbar}>
-        <label style={{ marginRight: 8, fontWeight: 600, color: '#aaa', fontSize: 13 }}>
-          Run:
-        </label>
-        <select
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
-          style={selectStyle}
-        >
-          {runs.length === 0 && <option value="">(no runs found)</option>}
-          {runs.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-        <button onClick={() => loadRun(selected)} style={btnStyle}>
-          Reload
-        </button>
-        {loading && <span style={{ marginLeft: 12, color: '#888', fontSize: 12 }}>Loading…</span>}
-      </div>
-
-      {error && (
-        <div style={errorBar}>
-          {error}
+        <span style={headerTitle}>AI Village</span>
+        <span style={headerSub}>simulation viewer</span>
+        <div style={{ flex: 1 }} />
+        <div style={toolbar}>
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            style={selectStyle}
+          >
+            {runs.length === 0 && <option value="">(no runs found)</option>}
+            {runs.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => loadRun(selected)} style={btnStyle}>
+            Reload
+          </button>
+          {loading && <span style={{ marginLeft: 12, color: '#888', fontSize: 12 }}>Loading…</span>}
         </div>
-      )}
+      </div>
+
+      {error && <div style={errorBar}>{error}</div>}
 
       {data && (
         <>
           <div style={metaBar}>
-            <span>{data.citizen_peer_ids.length} citizen(s)</span>
-            <span>{data.actions_per_epoch} actions/epoch</span>
-            <span>{data.max_epochs} epochs</span>
-            <span style={{ color: '#888' }}>run: {data.run_id}</span>
+            <span><strong style={{ color: '#888' }}>run</strong> {data.run_id}</span>
+            <span><strong style={{ color: '#888' }}>citizens</strong> {data.citizen_peer_ids.length}</span>
+            <span><strong style={{ color: '#888' }}>actions/epoch</strong> {data.actions_per_epoch}</span>
+            <span><strong style={{ color: '#888' }}>epochs</strong> {data.max_epochs}</span>
           </div>
-          <div style={{ background: '#111', borderRadius: 8, padding: 16, marginBottom: 24 }}>
-            <GiniChart data={data} width={700} height={280} />
+
+          <div ref={chartRef} style={chartCard}>
+            <GiniChart data={data} width={chartWidth} height={280} />
           </div>
+
           <ActionsTable data={data} />
         </>
       )}
@@ -96,28 +96,41 @@ export default function App() {
 }
 
 const container: React.CSSProperties = {
-  maxWidth: 850,
-  margin: '0 auto',
-  padding: '0 16px 64px',
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   color: '#e0e0e0',
   background: '#0d0d0d',
   minHeight: '100vh',
+  padding: '0 24px 80px',
 };
 
 const headerBar: React.CSSProperties = {
   display: 'flex',
-  alignItems: 'baseline',
-  gap: 12,
-  padding: '20px 0 12px',
+  alignItems: 'center',
+  gap: 10,
+  padding: '16px 0',
   borderBottom: '1px solid #222',
-  marginBottom: 16,
+  marginBottom: 20,
+  position: 'sticky',
+  top: 0,
+  background: '#0d0d0d',
+  zIndex: 10,
+};
+
+const headerTitle: React.CSSProperties = {
+  fontSize: 22,
+  fontWeight: 700,
+  letterSpacing: '-0.3px',
+};
+
+const headerSub: React.CSSProperties = {
+  fontSize: 12,
+  color: '#555',
+  marginTop: 4,
 };
 
 const toolbar: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  marginBottom: 16,
 };
 
 const selectStyle: React.CSSProperties = {
@@ -156,10 +169,20 @@ const errorBar: React.CSSProperties = {
 
 const metaBar: React.CSSProperties = {
   display: 'flex',
-  gap: 16,
-  marginBottom: 20,
-  fontSize: 12,
+  gap: 24,
+  marginBottom: 24,
+  fontSize: 13,
   color: '#666',
-  padding: '8px 0',
-  borderBottom: '1px solid #222',
+  padding: '10px 16px',
+  background: '#141414',
+  borderRadius: 8,
+  border: '1px solid #222',
+};
+
+const chartCard: React.CSSProperties = {
+  background: '#111',
+  borderRadius: 8,
+  padding: 20,
+  marginBottom: 28,
+  border: '1px solid #222',
 };
