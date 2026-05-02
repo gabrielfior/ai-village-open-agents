@@ -12,14 +12,18 @@ export interface ActionEntry {
   slot: number;
   action: string;
   amount?: number;
-  counterparty?: string;
+  resource?: string;
+  give_resource?: string;
   give?: number;
+  want_resource?: string;
   want?: number;
+  counterparty?: string;
   accepted?: boolean;
   outcome?: string;
   offer_id?: string;
   from?: string;
   executed?: boolean;
+  why?: string;
 }
 
 export interface GiniTimeseries {
