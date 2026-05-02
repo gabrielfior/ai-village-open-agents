@@ -268,7 +268,7 @@ class CitizenAgent:
         self.do_action(run_id, {"type": "dummy", "why": "always_on_epoch_start"})
 
         peer_candidates = [
-            p for p in (st.get("enrolled") or [])
+            p for p in (all_peer_ids or [])
             if p.lower() != self.peer_id
         ]
         earn_used = 0

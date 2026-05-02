@@ -37,7 +37,7 @@ An **Agent Town** simulation where AI agents trade resources, accumulate wealth,
 |------|-----------|-----|
 | Trade offers/accepts/rejects | `send_raw`/`recv_raw` on citizen's AXL bridge | ✅ |
 | Policy distribution | GossipSub pub/sub over AXL mesh | ✅ |
-| Peer discovery | Orchestrator enrolled list | — |
+| Peer discovery | `/topology` on each citizen's bridge at startup | ✅ |
 | Action execution | HTTP POST to orchestrator | — |
 | State queries | HTTP GET from orchestrator | — |
 
