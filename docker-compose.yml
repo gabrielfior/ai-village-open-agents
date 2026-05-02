@@ -23,16 +23,15 @@ services:
       start_period: 5s
 
   # ── AXL Mesh ────────────────────────────────────────────────────
-  # All 4 P2P nodes in one container (profile: mesh).
-  # Auto-generates PEM keys and configs at startup.
+  # All P2P nodes in one container (profile: mesh).
+  # NUM_CITIZENS env var controls how many citizen nodes are created
+  # (default 10).  Auto-generates PEM keys and configs at startup.
   # Nodes peer internally via 127.0.0.1.
-  # Host reaches them through exposed api_ports.
   #
-  #   Node           api_port  tcp_port  Listen (TLS)
-  #   Yellow Pages     9002     7000     tls://0.0.0.0:9001
-  #   Mayor            9004     7001     tls://0.0.0.0:9003
-  #   Citizen A        9012     7100     tls://0.0.0.0:9011
-  #   Citizen B        9013     7101     tls://0.0.0.0:9010
+  #   Node group     api_ports         tcp_ports  Listen (TLS)
+  #   Yellow Pages   9002              7000       tls://0.0.0.0:9001
+  #   Mayor          9004              7001       tls://0.0.0.0:9003
+  #   Citizens       9012-9021         7100-7109  tls://0.0.0.0:9011-9020
   # ─────────────────────────────────────────────────────────────────
   village-mesh:
     build:
@@ -42,15 +41,13 @@ services:
     hostname: village-mesh
     profiles: ["mesh"]
     ports:
-      - "9002:9002"   # Yellow Pages AXL node API
-      - "9004:9004"   # Mayor AXL node API
-      - "9012:9012"   # Citizen A AXL node API
-      - "9013:9013"   # Citizen B AXL node API
+      - "9002:9002"     # Yellow Pages
+      - "9004:9004"     # Mayor
+      - "9012-9021:9012-9021"  # 10 citizens
     healthcheck:
       test: ["CMD", "sh", "-c",
         "curl -fsS http://localhost:9002/topology &&
-         curl -fsS http://localhost:9012/topology &&
-         curl -fsS http://localhost:9013/topology"]
+         curl -fsS http://localhost:9012/topology"]
       interval: 5s
       timeout: 3s
       retries: 20

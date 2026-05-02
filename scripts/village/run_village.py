@@ -340,27 +340,29 @@ class CitizenAgent:
 
 def discover_peers(
     ports: list[int],
+    names: list[str] | None = None,
     *,
     host: str = "localhost",
-    timeout: float = 30.0,
+    timeout_per_port: float = 30.0,
 ) -> dict[str, str]:
-    names = ["yellow_pages_peer_id", "mayor_peer_id", "citizen_a_peer_id", "citizen_b_peer_id"]
+    """Query each bridge /topology, return dict of names → peer_id."""
+    if names is None:
+        names = [f"p{p}" for p in ports]
     result: dict[str, str] = {}
-    deadline = time.time() + timeout
     for port, name in zip(ports, names):
-        while time.time() < deadline:
+        t0 = time.time()
+        pk = ""
+        while time.time() - t0 < timeout_per_port:
             try:
                 r = _json(f"http://{host}:{port}/topology")
                 pk = r.get("our_public_key", "")
                 if pk:
                     result[name] = pk.lower()
-                    print(f"[discover] {name}={pk[:16]}… (port {port})")
                     break
             except Exception:
                 pass
             time.sleep(0.3)
-        if name not in result:
-            print(f"[discover] WARNING: {name} not ready on port {port}")
+        print(f"[discover] {name}={pk[:16] if pk else 'N/A'}… (port {port})")
     return result
 
 
@@ -375,24 +377,35 @@ def main() -> int:
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--orch-url", default="http://localhost:9200")
     p.add_argument("--yp-url", default="http://localhost:9105/mcp")
-    p.add_argument("--mesh-ports", type=int, nargs="*",
-                   default=[9002, 9004, 9012, 9013])
+    p.add_argument("--num-citizens", type=int, default=10,
+                   help="Number of citizen agents (default 10)")
+    p.add_argument("--mesh-ports", type=int, nargs="*", default=None,
+                   help="AXL bridge ports (auto-derived from --num-citizens if omitted)")
     p.add_argument("--runs-dir", type=Path,
                    default=Path(__file__).resolve().parent / "runs")
     args = p.parse_args()
 
+    nc = max(1, args.num_citizens)
     run_dir = args.runs_dir / args.run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     orch = args.orch_url.rstrip("/")
 
+    # ── build port list ──────────────────────────────────────────
+    if args.mesh_ports is not None:
+        mesh_ports = list(args.mesh_ports)
+    else:
+        mesh_ports = [9002, 9004] + [9012 + i for i in range(nc)]
+    port_names = (["yellow_pages_peer_id", "mayor_peer_id"]
+                  + [f"citizen_{i}_peer_id" for i in range(nc)])
+
     # ── discover peers from mesh ──────────────────────────────────
-    print("[main] Discovering mesh peers…")
-    peers = discover_peers(args.mesh_ports)
+    print(f"[main] Discovering {len(mesh_ports)} mesh peers…")
+    peers = discover_peers(mesh_ports, port_names)
     yp_id = peers.get("yellow_pages_peer_id", "")
-    ca_id = peers.get("citizen_a_peer_id", "")
-    cb_id = peers.get("citizen_b_peer_id", "")
-    if not yp_id or not ca_id or not cb_id:
-        print("[main] ERROR: mesh not ready — start Docker with --profile mesh")
+    citizen_ids = [peers.get(f"citizen_{i}_peer_id", "") for i in range(nc)]
+    missing = [i for i, p in enumerate(citizen_ids) if not p]
+    if not yp_id or missing:
+        print(f"[main] ERROR: mesh not ready (missing {len(missing)} citizens)")
         return 1
 
     # ── create run ────────────────────────────────────────────────
@@ -406,15 +419,15 @@ def main() -> int:
         "max_epochs": args.epochs,
         "actions_per_epoch": args.actions_per_epoch,
         "initial_balance": args.initial_balance,
-        "citizens": [ca_id, cb_id],
+        "citizens": citizen_ids,
     })
     print(f"[main] Run {args.run_id} created  enrolled={len(create.get('enrolled', []))}")
 
     # ── register agents + join ────────────────────────────────────
     exchange = TradeExchange()
     agents = [
-        CitizenAgent(ca_id, orch, args.yp_url, args.seed, exchange),
-        CitizenAgent(cb_id, orch, args.yp_url, args.seed + 1, exchange),
+        CitizenAgent(citizen_ids[i], orch, args.yp_url, args.seed + i, exchange)
+        for i in range(nc)
     ]
     for a in agents:
         a.register_yp()
@@ -499,7 +512,7 @@ def main() -> int:
         "run_id": args.run_id,
         "max_epochs": args.epochs,
         "actions_per_epoch": args.actions_per_epoch,
-        "citizen_peer_ids": [ca_id, cb_id],
+        "citizen_peer_ids": citizen_ids,
         "gini_timeseries": series,
         "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
