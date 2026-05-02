@@ -156,12 +156,14 @@ export default function ActionsTable({ data }: Props) {
                     const open = expanded.has(key);
                     const colorIdx = citizenIds.indexOf(a.citizen);
                     const bg = i % 2 === 0 ? '#1a1a1a' : '#222';
-                    return (
-                      <tr key={key} style={{ background: bg }}>
-                        <td style={{ ...tdStyle, color: '#666', textAlign: 'center', cursor: 'pointer' }}
-                            onClick={() => toggle(key)}>
-                          {a.slot}
-                          <span style={{ marginLeft: 4, fontSize: 9, color: '#555' }}>
+                    const details = detailRows(a);
+                    return [
+                      // action row
+                      <tr key={key} style={{ background: bg, cursor: 'pointer' }}
+                          onClick={() => toggle(key)}>
+                        <td style={{ ...tdStyle, color: '#666', textAlign: 'center' }}>
+                          {a.slot}{' '}
+                          <span style={{ fontSize: 9, color: '#555' }}>
                             {open ? '▲' : '▼'}
                           </span>
                         </td>
@@ -174,47 +176,43 @@ export default function ActionsTable({ data }: Props) {
                         <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 13 }}>
                           {actionSummary(a) || <span style={{ color: '#555' }}>—</span>}
                         </td>
-                      </tr>
-                    );
+                      </tr>,
+                      // detail row (only when expanded)
+                      open ? (
+                        <tr key={`${key}-d`} style={{ background: '#0a0a0a' }}>
+                          <td colSpan={4} style={{ padding: 0, border: '1px solid #333', borderTop: 'none' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                              <tbody>
+                                {details.map((r) => (
+                                  <tr key={r.label}>
+                                    <td style={{ ...detailTd, color: '#777', width: 140, paddingLeft: 36 }}>{r.label}</td>
+                                    <td style={{ ...detailTd, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                                      {r.label === 'citizen' || r.label === 'counterparty' || r.label === 'from' ? (
+                                        <span style={{ color: CITIZEN_COLORS[citizenIds.indexOf(r.value)] || '#aaa' }}>
+                                          {r.value}
+                                        </span>
+                                      ) : r.label === 'give_resource' || r.label === 'want_resource' || r.label === 'resource' ? (
+                                        <span style={{ color: RESOURCE_COLORS[r.value] || '#ccc', fontWeight: 600 }}>
+                                          {r.value}
+                                        </span>
+                                      ) : (
+                                        r.value
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      ) : null,
+                    ];
                   })}
                 </tbody>
               </table>
             ) : (
               <p style={{ color: '#666', fontStyle: 'italic' }}>No action log available.</p>
             )}
-
-            {/* expanded detail panels */}
-            {log.map((a, i) => {
-              const key = `${snap.epoch}-${i}`;
-              if (!expanded.has(key)) return null;
-              const details = detailRows(a);
-              return (
-                <div key={`d-${key}`} style={detailPanel}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <tbody>
-                      {details.map((r) => (
-                        <tr key={r.label}>
-                          <td style={{ ...detailTd, color: '#888', width: 140 }}>{r.label}</td>
-                          <td style={{ ...detailTd, fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                            {r.label === 'citizen' || r.label === 'counterparty' || r.label === 'from' ? (
-                              <span style={{ color: CITIZEN_COLORS[citizenIds.indexOf(r.value)] || '#aaa' }}>
-                                {r.value}
-                              </span>
-                            ) : r.label === 'give_resource' || r.label === 'want_resource' || r.label === 'resource' ? (
-                              <span style={{ color: RESOURCE_COLORS[r.value] || '#ccc', fontWeight: 600 }}>
-                                {r.value}
-                              </span>
-                            ) : (
-                              r.value
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })}
 
             <div style={balanceBar}>
               {citizenIds.map((c, i) => {
