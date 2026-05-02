@@ -124,3 +124,46 @@ launch_village.sh          # One-command launcher
 | Star topology over Yggdrasil | 12 AXL nodes in one container, routed via Yggdrasil TLS |
 | Per-citizen bridge ports | Each citizen has a dedicated AXL node (9012–9021) |
 | Trade message protocol | Custom JSON envelope over AXL (`village/v1` namespace) |
+
+## Future work
+
+### LLM-powered citizen brains
+
+Replace the random action policy with LLM calls (via 0G Compute Network or any provider). Each citizen would query an LLM to decide actions based on:
+- Current resource holdings and consumption needs
+- Counterparty reputation from past trades
+- Historical policy trends (tax rate trajectory)
+- Strategic goals (wealth accumulation, risk tolerance)
+
+This turns the simulation from random agents into **strategic agents** — trades become actual negotiations, citizens can form coalitions, and the economy's behavior becomes emergent rather than statistical.
+
+### Experience-based learning
+
+Give citizens memory of past actions and outcomes:
+- Which counterparties accepted vs rejected previous offers
+- Which resources have the best earn rates given their skills
+- Optimal trade ratios learned from historical data
+- Adaptation to policy changes (e.g., front-running tax increases)
+
+### Decentralized state (remove orchestrator)
+
+Replace the orchestrator with a fully P2P consensus mechanism over AXL:
+- Epoch lifecycle coordinated via AXL GossipSub
+- Resource ledger replicated across all citizens
+- Tax/UBI applied locally from agreed-upon state
+- Fraud detection via cross-validation between peers
+
+### Subprocess citizens
+
+Convert thread-based citizens to standalone OS processes (using `citizen.py` as the reference). Each citizen spawns its own AXL node binary, runs independently, and can be killed/restarted without affecting others. This would satisfy the "separate AXL nodes" criterion literally.
+
+### Agent chat protocol
+
+Add a `"msg": "chat"` message type alongside trades. Citizens could send free-form messages visible in the UI — enabling negotiation, alliance formation, or banter. This would demonstrate AXL's flexibility for non-trade communication.
+
+### More charts and analytics
+
+- Trade network graph (who traded with whom)
+- Sankey diagram of resource flows through the economy
+- Policy sensitivity analysis (what-if scenarios)
+- Per-citizen action timelines
