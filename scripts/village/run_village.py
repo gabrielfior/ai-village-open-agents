@@ -77,6 +77,8 @@ def next_policy(prev: dict[str, Any], gini: float) -> dict[str, Any]:
 
 # ── citizen brain (random) ────────────────────────────────────────
 
+RESOURCES = ["coin", "wood", "stone", "grain"]
+
 class CitizenBrain:
     def __init__(self, seed: int, peer_id: str) -> None:
         h = hashlib.sha256(f"{seed}:{peer_id}".encode()).digest()
@@ -85,7 +87,7 @@ class CitizenBrain:
     def pick_action(
         self,
         peer_candidates: list[str],
-        balance: int,
+        resources: dict[str, int],
         earn_remaining: int,
     ) -> dict[str, Any]:
         r = self.rng.random()
@@ -93,15 +95,20 @@ class CitizenBrain:
         if not peer_candidates or r < noop_p:
             return {"type": "noop"}
         if r < 0.65 and earn_remaining > 0:
+            resource = self.rng.choice(RESOURCES)
             amt = min(self.rng.randint(1, 15), earn_remaining)
-            return {"type": "earn", "amount": amt}
+            return {"type": "earn", "resource": resource, "amount": amt}
         cp = self.rng.choice(peer_candidates)
-        give = min(balance, max(1, self.rng.randint(1, min(10, max(1, balance)))))
+        give_resource = self.rng.choice(RESOURCES)
+        want_resource = self.rng.choice([r for r in RESOURCES if r != give_resource])
+        give = max(1, min(resources.get(give_resource, 0), self.rng.randint(1, 10)))
         want = max(1, self.rng.randint(1, 10))
         return {
             "type": "trade_offer",
             "counterparty": cp,
+            "give_resource": give_resource,
             "give_amount": give,
+            "want_resource": want_resource,
             "want_amount": want,
         }
 
@@ -121,15 +128,18 @@ class TradeExchange:
         offer_id: str,
         from_pid: str,
         to_pid: str,
-        give: int,
-        want: int,
+        give_resource: str,
+        give_amount: int,
+        want_resource: str,
+        want_amount: int,
         timeout: float = 6.0,
     ) -> bool:
         evt = threading.Event()
         with self._lock:
             self._offers[offer_id] = {
                 "from": from_pid, "to": to_pid,
-                "give": give, "want": want,
+                "give_resource": give_resource, "give": give_amount,
+                "want_resource": want_resource, "want": want_amount,
             }
             self._events[offer_id] = evt
         try:
@@ -234,10 +244,14 @@ class CitizenAgent:
             {"run_id": run_id, "peer_id": self.peer_id},
         )
 
+    def _my_resources(self, st: dict[str, Any]) -> dict[str, int]:
+        raw = st.get("resources", {}).get(self.peer_id, {})
+        return {r: int(raw.get(r, 0)) for r in RESOURCES}
+
     def run_epoch(self, run_id: str, epoch: int, n_actions: int) -> None:
         self.actions_log.clear()
         st = self.state(run_id)
-        bal = int(st.get("balances", {}).get(self.peer_id, 0))
+        my_res = self._my_resources(st)
 
         self._log("dummy", {"why": "always_on_epoch_start"})
         self.do_action(run_id, {"type": "dummy", "why": "always_on_epoch_start"})
@@ -254,7 +268,7 @@ class CitizenAgent:
             used = int(st.get("slots_used", {}).get(self.peer_id, 0))
             if used >= n_actions:
                 break
-            bal = int(st.get("balances", {}).get(self.peer_id, 0))
+            my_res = self._my_resources(st)
             earn_remaining = max(0, self.earn_cap - earn_used)
 
             # pending commits (counterparty accepted our trade_prepare)
@@ -267,7 +281,9 @@ class CitizenAgent:
             # incoming trade offers — counterparty must call trade_commit
             handled = False
             for oid, off in self.exchange.incoming_offers(self.peer_id):
-                if bal >= off["want"] and self.brain.rng.random() < 0.7:
+                need = off.get("want_resource", "coin")
+                have = off.get("want", 0)
+                if my_res.get(need, 0) >= have and self.brain.rng.random() < 0.7:
                     self.exchange.accept_offer(oid)
                     out = self.do_action(run_id, {
                         "type": "trade_commit",
@@ -275,8 +291,10 @@ class CitizenAgent:
                     })
                     self._log("trade_accept", {
                         "from": off["from"],
-                        "give": off["give"],
-                        "want": off["want"],
+                        "give_resource": off.get("give_resource", "coin"),
+                        "give": off.get("give", 0),
+                        "want_resource": off.get("want_resource", "coin"),
+                        "want": off.get("want", 0),
                         "executed": out.get("decision") == "applied",
                     })
                     handled = True
@@ -286,7 +304,7 @@ class CitizenAgent:
 
             # pick fresh action
             action_def = self.brain.pick_action(
-                peer_candidates, bal, earn_remaining
+                peer_candidates, my_res, earn_remaining
             )
             kind = action_def["type"]
 
@@ -295,32 +313,40 @@ class CitizenAgent:
                 self.do_action(run_id, action_def)
 
             elif kind == "earn":
+                resource = action_def.get("resource", "coin")
                 take = min(action_def["amount"], earn_remaining)
                 if take > 0:
-                    self._log("earn", {"amount": take})
-                    out = self.do_action(run_id, {"type": "earn", "amount": take})
+                    self._log("earn", {"resource": resource, "amount": take})
+                    out = self.do_action(run_id, {"type": "earn", "resource": resource, "amount": take})
                     if out.get("decision") == "applied":
                         earn_used += take
 
             elif kind == "trade_offer":
                 cp = action_def["counterparty"]
-                give = action_def["give_amount"]
-                want = action_def["want_amount"]
+                give_resource = action_def.get("give_resource", "coin")
+                give_amount = action_def.get("give_amount", 0)
+                want_resource = action_def.get("want_resource", "coin")
+                want_amount = action_def.get("want_amount", 0)
                 oid = f"o{self.brain.rng.getrandbits(48):012x}"
 
                 out = self.do_action(run_id, {
                     "type": "trade_prepare",
                     "offer_id": oid,
                     "counterparty": cp,
-                    "give_amount": give,
-                    "want_amount": want,
+                    "give_resource": give_resource,
+                    "give_amount": give_amount,
+                    "want_resource": want_resource,
+                    "want_amount": want_amount,
                 })
                 if out.get("decision") == "applied":
                     accepted = self.exchange.make_offer(
-                        oid, self.peer_id, cp, give, want
+                        oid, self.peer_id, cp, give_resource, give_amount,
+                        want_resource, want_amount,
                     )
                     self._log("trade_offer", {
-                        "counterparty": cp, "give": give, "want": want,
+                        "counterparty": cp,
+                        "give_resource": give_resource, "give": give_amount,
+                        "want_resource": want_resource, "want": want_amount,
                         "accepted": accepted,
                     })
                     if accepted:
