@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Single-process village simulation — no subprocesses, no GossipSub.
+Single-process village simulation — AXL P2P trades, GossipSub policy, no Yellow Pages.
 
 Citizens run as threading.Threads in the same process, talking to
 Docker services via HTTP.  AXL nodes are already running inside Docker.
@@ -18,6 +18,7 @@ import hashlib
 import json
 import random
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -29,7 +30,9 @@ _SCRIPTS = Path(__file__).resolve().parent
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from village_axl import recv_raw, send_raw
+from village_axl import recv_raw, send_raw, load_gossip_sub, bridge_gossip_fns, policy_topic
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 # ── helpers ───────────────────────────────────────────────────────
@@ -43,15 +46,6 @@ def _post(url: str, body: dict[str, Any]) -> dict[str, Any]:
     data = json.dumps(body).encode()
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read().decode())
-
-
-def _mcp(url: str, body: dict[str, Any]) -> dict[str, Any]:
-    data = json.dumps(body).encode()
-    req = urllib.request.Request(url, data=data, method="POST")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Accept", "application/json")
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read().decode())
 
@@ -93,6 +87,26 @@ RESOURCES = ["coin", "wood", "stone", "grain"]
 
 def enc_village(msg: dict[str, Any]) -> bytes:
     return json.dumps(msg, separators=(",", ":")).encode("utf-8")
+
+
+def gossip_policy(gs: Any, gs_lock: threading.Lock, topic: str, run_id: str, want_epoch: int, timeout: float) -> dict[str, Any] | None:
+    import base64
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        with gs_lock:
+            for mid in list(gs._received):
+                msg = gs.msg_cache.get(mid)
+                if not msg or msg.get("topic") != topic:
+                    continue
+                try:
+                    raw = base64.b64decode(msg.get("data", ""))
+                    env = json.loads(raw.decode("utf-8"))
+                    if env.get("run_id") == run_id and int(env.get("epoch", -1)) == want_epoch:
+                        return env
+                except (json.JSONDecodeError, ValueError):
+                    continue
+        time.sleep(0.05)
+    return None
 
 
 class CitizenBrain:
@@ -137,61 +151,38 @@ class CitizenAgent:
         peer_id: str,
         orch_url: str,
         bridge_url: str,
-        yp_url: str,
         seed: int,
         earn_cap: int = 100,
     ) -> None:
         self.peer_id = peer_id
         self.orch_url = orch_url
         self.bridge_url = bridge_url
-        self.yp_url = yp_url
         self.earn_cap = earn_cap
         self.brain = CitizenBrain(seed, peer_id)
         self.actions_log: list[dict[str, Any]] = []
         self._pending_accepts: set[str] = set()
         self._pending_commits: list[str] = []
+        self._policy: dict[str, Any] | None = None
 
-    # ── Yellow Pages helpers ─────────────────────────────────────
-    def register_yp(self) -> None:
-        _mcp(self.yp_url, {
-            "jsonrpc": "2.0", "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "citizen", "version": "0.1"},
-            },
-            "id": 0,
-        })
-        _mcp(self.yp_url, {
-            "jsonrpc": "2.0", "method": "tools/call",
-            "params": {
-                "name": "register_agent",
-                "arguments": {
-                    "peer_id": self.peer_id,
-                    "role": "citizen",
-                    "caps": ["trade", "chat"],
-                },
-            },
-            "id": 1,
-        })
+        GossipSub, GossipConfig = load_gossip_sub(REPO_ROOT)
+        send_fn, recv_fn = bridge_gossip_fns(bridge_url)
+        self._gs = GossipSub(GossipConfig(), peer_id, send_fn, recv_fn)
+        self._gs_lock = threading.Lock()
+        self._tick_running = True
+        self._tick_thread = threading.Thread(target=self._tick_loop, daemon=True)
+        self._tick_thread.start()
 
-    def list_peers_yp(self) -> list[str]:
-        raw = _mcp(self.yp_url, {
-            "jsonrpc": "2.0", "method": "tools/call",
-            "params": {
-                "name": "list_peer_ids",
-                "arguments": {"role_filter": "citizen"},
-            },
-            "id": 1,
-        })
-        content = (raw.get("result") or {}).get("content") or []
-        if content and isinstance(content[0], dict) and content[0].get("type") == "text":
+    def _tick_loop(self) -> None:
+        while getattr(self, '_tick_running', True):
             try:
-                obj = json.loads(content[0]["text"])
-                return [p for p in obj.get("peer_ids", []) if p.lower() != self.peer_id]
-            except (json.JSONDecodeError, TypeError):
+                with self._gs_lock:
+                    self._gs.tick()
+            except Exception:
                 pass
-        return []
+            time.sleep(0.05)
+
+    def _stop_tick(self) -> None:
+        self._tick_running = False
 
     # ── orchestrator helpers ──────────────────────────────────────
     def state(self, run_id: str) -> dict[str, Any]:
@@ -204,6 +195,8 @@ class CitizenAgent:
         )
 
     def _drain_inbox(self, run_id: str) -> None:
+        with self._gs_lock:
+            self._gs.tick()
         while True:
             got = recv_raw(self.bridge_url)
             if not got:
@@ -245,17 +238,39 @@ class CitizenAgent:
         raw = st.get("resources", {}).get(self.peer_id, {})
         return {r: int(raw.get(r, 0)) for r in RESOURCES}
 
-    def run_epoch(self, run_id: str, epoch: int, n_actions: int) -> None:
+    def run_epoch(self, run_id: str, epoch: int, n_actions: int, all_peer_ids: list[str] | None = None) -> None:
         self.actions_log.clear()
         self._pending_accepts.clear()
         self._pending_commits.clear()
+
+        # Subscribe to GossipSub policy topic for this run
+        topic = policy_topic(run_id)
+        self._gs.subscribe(topic)
+        # Seed GossipSub mesh with ALL peer IDs for routing
+        if all_peer_ids:
+            for pid in all_peer_ids:
+                self._gs.add_peer(pid)
+
+        # Try to get policy from GossipSub first, fall back to orchestrator
+        env = gossip_policy(self._gs, self._gs_lock, topic, run_id, epoch, timeout=0.5)
+        if env:
+            self._policy = env.get("policy")
+            print(f"  [gossip] citizen {self.peer_id[:16]}… policy via GossipSub epoch={epoch}")
+        else:
+            st = self.state(run_id)
+            self._policy = st.get("policy")
+            print(f"  [gossip] citizen {self.peer_id[:16]}… policy from orchestrator epoch={epoch}")
+
         st = self.state(run_id)
         my_res = self._my_resources(st)
 
         self._log("dummy", {"why": "always_on_epoch_start"})
         self.do_action(run_id, {"type": "dummy", "why": "always_on_epoch_start"})
 
-        peer_candidates = self.list_peers_yp()
+        peer_candidates = [
+            p for p in (st.get("enrolled") or [])
+            if p.lower() != self.peer_id
+        ]
         earn_used = 0
 
         while True:
@@ -394,7 +409,6 @@ def main() -> int:
     p.add_argument("--initial-ubi", type=int, default=5)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--orch-url", default="http://localhost:9200")
-    p.add_argument("--yp-url", default="http://localhost:9105/mcp")
     p.add_argument("--num-citizens", type=int, default=10,
                    help="Number of citizen agents (default 10)")
     p.add_argument("--mesh-ports", type=int, nargs="*", default=None,
@@ -438,6 +452,19 @@ def main() -> int:
     except urllib.error.HTTPError:
         pass
 
+    # ── init GossipSub for town hall (mayor's bridge) ────────────
+    mayor_bridge = "http://localhost:9004"
+    mayor_topo = _json(f"{mayor_bridge}/topology")
+    mayor_id = str(mayor_topo.get("our_public_key", "")).strip().lower()
+    GossipSub, GossipConfig = load_gossip_sub(REPO_ROOT)
+    mayor_send, mayor_recv = bridge_gossip_fns(mayor_bridge)
+    town_hall_gs = GossipSub(GossipConfig(), mayor_id, mayor_send, mayor_recv)
+    gossip_topic = policy_topic(args.run_id)
+    town_hall_gs.subscribe(gossip_topic)
+    # Seed with ALL known peer IDs for GossipSub mesh routing
+    for pid in citizen_ids:
+        town_hall_gs.add_peer(pid)
+
     create = _post(f"{orch}/v1/run/create", {
         "run_id": args.run_id,
         "max_epochs": args.epochs,
@@ -452,13 +479,11 @@ def main() -> int:
         CitizenAgent(
             citizen_ids[i], orch,
             bridge_url=f"http://localhost:{mesh_ports[2 + i]}",
-            yp_url=args.yp_url,
             seed=args.seed + i,
         )
         for i in range(nc)
     ]
     for a in agents:
-        a.register_yp()
         bal = _post(f"{orch}/v1/run/join", {"run_id": args.run_id, "peer_id": a.peer_id})
         print(f"[main] {a.peer_id[:16]}… joined  balance={bal.get('balance')}")
 
@@ -478,12 +503,23 @@ def main() -> int:
         _post(f"{orch}/v1/epoch/open", {
             "run_id": args.run_id, "epoch": epoch, "policy": policy,
         })
-        print(f"[epoch {epoch}] Running citizens…")
+
+        # Publish policy via GossipSub
+        envelope = {
+            "run_id": args.run_id, "epoch": epoch, "policy": dict(policy),
+        }
+        payload = json.dumps(envelope, separators=(",", ":")).encode("utf-8")
+        town_hall_gs.publish(gossip_topic, payload)
+        # Tick to flush IHAVE/IWANT
+        for _ in range(5):
+            town_hall_gs.tick()
+            time.sleep(0.01)
+        print(f"[epoch {epoch}] Running citizens… (policy published via GossipSub)")
 
         t0 = time.perf_counter()
         with ThreadPoolExecutor(max_workers=len(agents)) as pool:
             futures = [
-                pool.submit(a.run_epoch, args.run_id, epoch, args.actions_per_epoch)
+                pool.submit(a.run_epoch, args.run_id, epoch, args.actions_per_epoch, citizen_ids)
                 for a in agents
             ]
             wait(futures)

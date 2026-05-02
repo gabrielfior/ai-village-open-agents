@@ -10,11 +10,9 @@ services:
     container_name: village-infra
     hostname: village-infra
     ports:
-      - "9105:9105"   # Yellow Pages MCP (direct HTTP)
       - "9200:9200"   # Orchestrator
     volumes:
       - ./scripts/village/runs:/app/runs
-      - ./scripts/village/yellow-pages-roster.json:/app/yellow-pages-roster.json
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:9200/v1/health"]
       interval: 5s
