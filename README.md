@@ -129,7 +129,7 @@ launch_village.sh          # One-command launcher
 
 ### LLM-powered citizen brains
 
-Replace the random action policy with LLM calls (via 0G Compute Network or any provider). Each citizen would query an LLM to decide actions based on:
+Replace the random action policy with LLM calls (via any inference provider). Each citizen would query an LLM to decide actions based on:
 - Current resource holdings and consumption needs
 - Counterparty reputation from past trades
 - Historical policy trends (tax rate trajectory)
