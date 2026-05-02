@@ -13,6 +13,7 @@ const ACTION_COLORS: Record<string, string> = {
   earn: '#4caf50',
   trade_offer: '#ff9800',
   trade_commit: '#2196f3',
+  trade_accept: '#26a69a',
   trade_prepare: '#9c27b0',
   noop: '#666',
   dummy: '#555',
@@ -65,6 +66,20 @@ function actionDetail(a: ActionEntry) {
   }
   if (a.action === 'trade_commit') {
     return <span style={{ color: '#90caf9' }}>offer {a.offer_id?.slice(0, 8) || ''}</span>;
+  }
+  if (a.action === 'trade_accept') {
+    const ok = a.executed ? 'executed' : 'rejected';
+    const color = a.executed ? '#a5d6a7' : '#ef9a9a';
+    return (
+      <span style={{ color: '#ccc' }}>
+        ← {shortPid(a.from || '')}{' '}
+        <span style={{ color: '#aaa' }}>take g</span>
+        <span style={{ color: '#ffb74d' }}>{a.give}</span>{' '}
+        <span style={{ color: '#aaa' }}>give w</span>
+        <span style={{ color: '#ffb74d' }}>{a.want}</span>{' '}
+        <span style={{ color }}>{ok}</span>
+      </span>
+    );
   }
   return null;
 }

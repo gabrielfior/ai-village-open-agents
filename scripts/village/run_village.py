@@ -264,20 +264,21 @@ class CitizenAgent:
                 self.do_action(run_id, {"type": "trade_commit", "offer_id": oid})
                 continue
 
-            # incoming trade offers
+            # incoming trade offers — counterparty must call trade_commit
             handled = False
             for oid, off in self.exchange.incoming_offers(self.peer_id):
                 if bal >= off["want"] and self.brain.rng.random() < 0.7:
                     self.exchange.accept_offer(oid)
                     out = self.do_action(run_id, {
-                        "type": "trade_prepare",
+                        "type": "trade_commit",
                         "offer_id": oid,
-                        "counterparty": off["from"],
-                        "give_amount": off["give"],
-                        "want_amount": off["want"],
                     })
-                    if out.get("decision") == "applied":
-                        pending_commits.append(oid)
+                    self._log("trade_accept", {
+                        "from": off["from"],
+                        "give": off["give"],
+                        "want": off["want"],
+                        "executed": out.get("decision") == "applied",
+                    })
                     handled = True
                     break
             if handled:

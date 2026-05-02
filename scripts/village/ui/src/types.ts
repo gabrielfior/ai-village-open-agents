@@ -18,6 +18,8 @@ export interface ActionEntry {
   accepted?: boolean;
   outcome?: string;
   offer_id?: string;
+  from?: string;
+  executed?: boolean;
 }
 
 export interface GiniTimeseries {
