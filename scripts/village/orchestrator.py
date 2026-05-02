@@ -407,9 +407,9 @@ class Orchestrator:
                 if not pend:
                     decision = "rejected"
                     reason = "unknown offer"
-                elif peer_id != pend.counterparty:
+                elif peer_id not in (pend.initiator, pend.counterparty):
                     decision = "rejected"
-                    reason = "not counterparty"
+                    reason = "not party to trade"
                 elif st.resources[pend.counterparty].get(pend.want_resource, 0) < pend.want_amount:
                     decision = "rejected"
                     reason = "insufficient counterparty resource"
@@ -497,15 +497,20 @@ class Orchestrator:
             ubi = int(st.policy.get("ubi", 5))
             pre_tax_resources = {p: dict(st.resources[p]) for p in st.enrolled}
 
-            # Wealth tax on coin only
+            # Wealth tax on ALL resources (proportional)
+            total_tax_pool = 0
             for p in st.enrolled:
-                coin = st.resources[p].get("coin", 0)
-                tax = int(coin * tax_rate)
-                st.resources[p]["coin"] = max(0, coin - tax)
+                for r in RESOURCES:
+                    amt = st.resources[p].get(r, 0)
+                    tax_units = int(amt * tax_rate)
+                    st.resources[p][r] = max(0, amt - tax_units)
+                    total_tax_pool += tax_units * RESOURCE_PRICES.get(r, 1)
 
-            # UBI in coin
+            # UBI: distribute total tax pool + policy UBI equally across all citizens
+            n = len(st.enrolled)
+            per_citizen = (total_tax_pool // n) + ubi
             for p in st.enrolled:
-                st.resources[p]["coin"] = st.resources[p].get("coin", 0) + ubi
+                st.resources[p]["coin"] = st.resources[p].get("coin", 0) + per_citizen
 
             # Consumption: citizens must consume from basket or face penalty
             consumption_shortfalls: dict[str, dict[str, int]] = {}

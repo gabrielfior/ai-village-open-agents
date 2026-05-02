@@ -28,6 +28,16 @@ def main() -> int:
     p.add_argument("--bridge", default="", help="AXL node bridge, e.g. http://127.0.0.1:9002")
     p.add_argument("--yellow-pages-mcp", default="", help="e.g. http://127.0.0.1:9105/mcp")
     p.add_argument("--town-hall-mcp", default="", help="e.g. http://127.0.0.1:9106/mcp")
+    p.add_argument(
+        "--citizen-mcp-probe",
+        default="",
+        help="e.g. http://127.0.0.1:9012 — POST .../mcp/<yp>/directory (often times out without router_addr)",
+    )
+    p.add_argument(
+        "--yellow-pages-peer-id",
+        default="",
+        help="64-hex mayor id (required with --citizen-mcp-probe)",
+    )
     args = p.parse_args()
 
     orch = args.orchestrator.rstrip("/")
@@ -122,6 +132,46 @@ def main() -> int:
         except OSError as e:
             print(f"FAIL town-hall-mcp {args.town_hall_mcp}  {e}")
             ok_all = False
+
+    if args.citizen_mcp_probe:
+        yp = (args.yellow_pages_peer_id or "").strip().lower()
+        if len(yp) != 64:
+            print("FAIL citizen-mcp-probe: pass --yellow-pages-peer-id 64-hex")
+            ok_all = False
+        else:
+            base = args.citizen_mcp_probe.rstrip("/")
+            murl = f"{base}/mcp/{yp}/directory"
+            init = json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {},
+                        "clientInfo": {"name": "port-check", "version": "0.1"},
+                    },
+                    "id": 0,
+                }
+            ).encode()
+            req = urllib.request.Request(
+                murl,
+                data=init,
+                method="POST",
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    raw = resp.read().decode()
+                    if resp.status == 200 and "result" in raw:
+                        print(f"OK  citizen-mcp-via-axl {murl}")
+                    else:
+                        print(f"WARN citizen-mcp-via-axl {murl} HTTP {resp.status}")
+            except OSError as e:
+                print(
+                    f"FAIL citizen-mcp-via-axl {murl}  {e}\n"
+                    f"     (expected locally unless node has router_addr; use yellow_pages_mcp_http / --mcp-http-url)"
+                )
+                ok_all = False
 
     if not ok_all:
         print("\nFix failures above, then create the run and start town_hall.", file=sys.stderr)

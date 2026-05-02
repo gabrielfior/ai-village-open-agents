@@ -18,13 +18,18 @@ import hashlib
 import json
 import random
 import sys
-import threading
 import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
 from typing import Any
+
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+from village_axl import recv_raw, send_raw
 
 
 # ── helpers ───────────────────────────────────────────────────────
@@ -65,19 +70,30 @@ def gini_coefficient(values: list[float]) -> float:
     return (2.0 * cum / (n * s)) - (n + 1.0) / n
 
 
-def next_policy(prev: dict[str, Any], gini: float) -> dict[str, Any]:
+def next_policy(
+    prev: dict[str, Any],
+    gini: float,
+    *,
+    multiplier: float = 0.2,
+    ubi_multiplier: float = 20.0,
+    target: float = 0.05,
+) -> dict[str, Any]:
     tax = float(prev.get("wealth_tax_rate", 0.1))
     ubi = int(prev.get("ubi", 5))
-    if gini > 0.35:
-        tax = min(0.45, tax + 0.02)
-    else:
-        tax = max(0.02, tax - 0.02)
-    return {"wealth_tax_rate": round(tax, 4), "ubi": ubi}
+    error = gini - target
+    tax = max(0.02, min(0.5, round(tax + error * multiplier, 4)))
+    ubi = max(0, min(50, ubi + round(error * ubi_multiplier)))
+    return {"wealth_tax_rate": tax, "ubi": ubi}
 
 
 # ── citizen brain (random) ────────────────────────────────────────
 
 RESOURCES = ["coin", "wood", "stone", "grain"]
+
+
+def enc_village(msg: dict[str, Any]) -> bytes:
+    return json.dumps(msg, separators=(",", ":")).encode("utf-8")
+
 
 class CitizenBrain:
     def __init__(self, seed: int, peer_id: str) -> None:
@@ -113,59 +129,6 @@ class CitizenBrain:
         }
 
 
-# ── in-memory trade exchange ──────────────────────────────────────
-
-class TradeExchange:
-    """Thread-safe offer/accept exchange between citizen threads."""
-
-    def __init__(self) -> None:
-        self._offers: dict[str, dict[str, Any]] = {}
-        self._lock = threading.Lock()
-        self._events: dict[str, threading.Event] = {}
-
-    def make_offer(
-        self,
-        offer_id: str,
-        from_pid: str,
-        to_pid: str,
-        give_resource: str,
-        give_amount: int,
-        want_resource: str,
-        want_amount: int,
-        timeout: float = 6.0,
-    ) -> bool:
-        evt = threading.Event()
-        with self._lock:
-            self._offers[offer_id] = {
-                "from": from_pid, "to": to_pid,
-                "give_resource": give_resource, "give": give_amount,
-                "want_resource": want_resource, "want": want_amount,
-            }
-            self._events[offer_id] = evt
-        try:
-            return evt.wait(timeout=timeout)
-        finally:
-            with self._lock:
-                self._offers.pop(offer_id, None)
-                self._events.pop(offer_id, None)
-
-    def incoming_offers(self, to_pid: str) -> list[tuple[str, dict[str, Any]]]:
-        with self._lock:
-            return [
-                (oid, dict(o))
-                for oid, o in self._offers.items()
-                if o["to"] == to_pid
-            ]
-
-    def accept_offer(self, offer_id: str) -> bool:
-        with self._lock:
-            evt = self._events.get(offer_id)
-            if evt is not None:
-                evt.set()
-                return True
-            return False
-
-
 # ── citizen agent (thread, no subprocess) ─────────────────────────
 
 class CitizenAgent:
@@ -173,18 +136,20 @@ class CitizenAgent:
         self,
         peer_id: str,
         orch_url: str,
+        bridge_url: str,
         yp_url: str,
         seed: int,
-        exchange: TradeExchange,
         earn_cap: int = 100,
     ) -> None:
         self.peer_id = peer_id
         self.orch_url = orch_url
+        self.bridge_url = bridge_url
         self.yp_url = yp_url
-        self.exchange = exchange
         self.earn_cap = earn_cap
         self.brain = CitizenBrain(seed, peer_id)
         self.actions_log: list[dict[str, Any]] = []
+        self._pending_accepts: set[str] = set()
+        self._pending_commits: list[str] = []
 
     # ── Yellow Pages helpers ─────────────────────────────────────
     def register_yp(self) -> None:
@@ -238,6 +203,38 @@ class CitizenAgent:
             {"run_id": run_id, "peer_id": self.peer_id, "action": action},
         )
 
+    def _drain_inbox(self, run_id: str) -> None:
+        while True:
+            got = recv_raw(self.bridge_url)
+            if not got:
+                break
+            _from, data = got
+            try:
+                msg = json.loads(data.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
+            if msg.get("village") != "v1":
+                continue
+            if msg.get("msg") == "trade_accept" and msg.get("offer_id"):
+                self._pending_accepts.add(str(msg["offer_id"]))
+                continue
+            if msg.get("msg") == "trade_offer" and msg.get("to") == self.peer_id:
+                oid = str(msg.get("offer_id", ""))
+                want_resource = str(msg.get("want_resource", "coin"))
+                want_amount = int(msg.get("want_amount", 0))
+                give_amount = int(msg.get("give_amount", 0))
+                st = self.state(run_id)
+                resources = st.get("resources", {}).get(self.peer_id, {})
+                have_amt = int(resources.get(want_resource, 0))
+                ok = have_amt >= want_amount and want_amount > 0 and give_amount > 0 and self.brain.rng.random() < 0.7
+                if ok:
+                    send_raw(self.bridge_url, _from,
+                        enc_village({"village": "v1", "msg": "trade_accept", "offer_id": oid}))
+                    self._pending_commits.append(oid)
+                else:
+                    send_raw(self.bridge_url, _from,
+                        enc_village({"village": "v1", "msg": "trade_reject", "offer_id": oid}))
+
     def epoch_complete(self, run_id: str) -> dict[str, Any]:
         return _post(
             f"{self.orch_url}/v1/epoch/complete",
@@ -250,6 +247,8 @@ class CitizenAgent:
 
     def run_epoch(self, run_id: str, epoch: int, n_actions: int) -> None:
         self.actions_log.clear()
+        self._pending_accepts.clear()
+        self._pending_commits.clear()
         st = self.state(run_id)
         my_res = self._my_resources(st)
 
@@ -258,8 +257,6 @@ class CitizenAgent:
 
         peer_candidates = self.list_peers_yp()
         earn_used = 0
-        pending_commits: list[str] = []
-        completed = set()
 
         while True:
             st = self.state(run_id)
@@ -271,35 +268,14 @@ class CitizenAgent:
             my_res = self._my_resources(st)
             earn_remaining = max(0, self.earn_cap - earn_used)
 
-            # pending commits (counterparty accepted our trade_prepare)
-            if pending_commits:
-                oid = pending_commits.pop(0)
-                self._log("trade_commit", {"offer_id": oid})
-                self.do_action(run_id, {"type": "trade_commit", "offer_id": oid})
-                continue
+            self._drain_inbox(run_id)
 
-            # incoming trade offers — counterparty must call trade_commit
-            handled = False
-            for oid, off in self.exchange.incoming_offers(self.peer_id):
-                need = off.get("want_resource", "coin")
-                have = off.get("want", 0)
-                if my_res.get(need, 0) >= have and self.brain.rng.random() < 0.7:
-                    self.exchange.accept_offer(oid)
-                    out = self.do_action(run_id, {
-                        "type": "trade_commit",
-                        "offer_id": oid,
-                    })
-                    self._log("trade_accept", {
-                        "from": off["from"],
-                        "give_resource": off.get("give_resource", "coin"),
-                        "give": off.get("give", 0),
-                        "want_resource": off.get("want_resource", "coin"),
-                        "want": off.get("want", 0),
-                        "executed": out.get("decision") == "applied",
-                    })
-                    handled = True
-                    break
-            if handled:
+            # pending commits (counterparty accepted our trade_prepare, or incoming offer accepted)
+            if self._pending_commits:
+                oid = self._pending_commits.pop(0)
+                out = self.do_action(run_id, {"type": "trade_commit", "offer_id": oid})
+                if out.get("decision") == "applied":
+                    self._log("trade_commit", {"offer_id": oid, "executed": True})
                 continue
 
             # pick fresh action
@@ -339,10 +315,25 @@ class CitizenAgent:
                     "want_amount": want_amount,
                 })
                 if out.get("decision") == "applied":
-                    accepted = self.exchange.make_offer(
-                        oid, self.peer_id, cp, give_resource, give_amount,
-                        want_resource, want_amount,
-                    )
+                    send_raw(self.bridge_url, cp,
+                        enc_village({
+                            "village": "v1", "msg": "trade_offer",
+                            "offer_id": oid, "run_id": run_id,
+                            "from": self.peer_id, "to": cp,
+                            "give_resource": give_resource, "give_amount": give_amount,
+                            "want_resource": want_resource, "want_amount": want_amount,
+                            "epoch": epoch,
+                        }))
+                    t0 = time.time()
+                    accepted = False
+                    trade_wait = 6.0
+                    while time.time() - t0 < trade_wait:
+                        self._drain_inbox(run_id)
+                        if oid in self._pending_accepts:
+                            self._pending_accepts.discard(oid)
+                            accepted = True
+                            break
+                        time.sleep(0.05)
                     self._log("trade_offer", {
                         "counterparty": cp,
                         "give_resource": give_resource, "give": give_amount,
@@ -350,7 +341,7 @@ class CitizenAgent:
                         "accepted": accepted,
                     })
                     if accepted:
-                        pending_commits.append(oid)
+                        self._pending_commits.append(oid)
 
         self.epoch_complete(run_id)
 
@@ -408,6 +399,12 @@ def main() -> int:
                    help="Number of citizen agents (default 10)")
     p.add_argument("--mesh-ports", type=int, nargs="*", default=None,
                    help="AXL bridge ports (auto-derived from --num-citizens if omitted)")
+    p.add_argument("--tax-adjust", type=float, default=5.0,
+                   help="Tax adjustment rate per unit of gini error (default 5.0)")
+    p.add_argument("--ubi-adjust", type=float, default=100.0,
+                   help="UBI adjustment rate per unit of gini error (default 100)")
+    p.add_argument("--gini-target", type=float, default=0.05,
+                   help="Target Gini coefficient (default 0.05)")
     p.add_argument("--runs-dir", type=Path,
                    default=Path(__file__).resolve().parent / "runs")
     args = p.parse_args()
@@ -451,9 +448,13 @@ def main() -> int:
     print(f"[main] Run {args.run_id} created  enrolled={len(create.get('enrolled', []))}")
 
     # ── register agents + join ────────────────────────────────────
-    exchange = TradeExchange()
     agents = [
-        CitizenAgent(citizen_ids[i], orch, args.yp_url, args.seed + i, exchange)
+        CitizenAgent(
+            citizen_ids[i], orch,
+            bridge_url=f"http://localhost:{mesh_ports[2 + i]}",
+            yp_url=args.yp_url,
+            seed=args.seed + i,
+        )
         for i in range(nc)
     ]
     for a in agents:
@@ -530,9 +531,11 @@ def main() -> int:
             "policy_applied": dict(policy),
             "balances": balances,
             "pre_tax_balances": pre_tax,
+            "resources": snap.get("resources", {}),
+            "wealth": snap.get("wealth", {}),
             "actions_log": actions_log,
         })
-        policy = next_policy(policy, gini)
+        policy = next_policy(policy, gini, multiplier=args.tax_adjust, ubi_multiplier=args.ubi_adjust, target=args.gini_target)
 
     # ── write summary ────────────────────────────────────────────
     summary = {

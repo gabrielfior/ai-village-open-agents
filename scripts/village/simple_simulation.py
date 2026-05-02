@@ -74,14 +74,14 @@ class Citizen:
 
 
 def next_policy(prev: dict[str, Any], gini: float) -> dict[str, Any]:
-    """Adaptive tax/UBI rule borrowed from town_hall.py."""
+    """Adaptive tax/UBI rule — targets gini ≤ 0.05."""
     tax = float(prev.get("wealth_tax_rate", 0.1))
     ubi = int(prev.get("ubi", 5))
-    if gini > 0.35:
-        tax = min(0.45, tax + 0.02)
-    else:
-        tax = max(0.02, tax - 0.02)
-    return {"wealth_tax_rate": round(tax, 4), "ubi": ubi}
+    target = 0.05
+    error = gini - target
+    tax = max(0.02, min(0.5, round(tax + error * 5.0, 4)))
+    ubi = max(0, min(50, ubi + round(error * 100)))
+    return {"wealth_tax_rate": tax, "ubi": ubi}
 
 
 def run_epoch(

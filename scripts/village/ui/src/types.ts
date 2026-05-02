@@ -4,6 +4,8 @@ export interface EpochSnapshot {
   policy_applied: { wealth_tax_rate: number; ubi: number };
   balances: Record<string, number>;
   pre_tax_balances: Record<string, number>;
+  resources?: Record<string, Record<string, number>>;
+  wealth?: Record<string, number>;
   actions_log?: ActionEntry[];
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { GiniTimeseries, ActionEntry } from './types';
+import { CITIZEN_COLORS, RESOURCE_COLORS } from './colors';
 
 interface Props {
   data: GiniTimeseries;
@@ -9,10 +10,6 @@ function shortPid(pid: string): string {
   return pid.length > 12 ? pid.slice(0, 12) + '…' : pid;
 }
 
-const CITIZEN_COLORS = ['#4fc3f7', '#ffb74d', '#81c784', '#e57373'];
-const RESOURCE_COLORS: Record<string, string> = {
-  coin: '#ffd54f', wood: '#a5d6a7', stone: '#90a4ae', grain: '#ffcc80',
-};
 const ACTION_COLORS: Record<string, string> = {
   earn: '#4caf50', trade_offer: '#ff9800', trade_commit: '#2196f3',
   trade_accept: '#26a69a', trade_prepare: '#9c27b0', noop: '#666', dummy: '#555',

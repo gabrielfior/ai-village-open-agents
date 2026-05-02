@@ -39,7 +39,387 @@
       ],
       "angle_rad": 0.2793663197033105,
       "last_seen": "2026-04-30T19:34:43.226096+00:00"
+    },
+    "f0c471fd767c887af0e845567176c591590064925b5c30454b654df1a06862b1": {
+      "peer_id": "f0c471fd767c887af0e845567176c591590064925b5c30454b654df1a06862b1",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 0.21954695690924642,
+      "last_seen": "2026-04-30T19:43:58.274941+00:00"
+    },
+    "0c0c721f08b7e5ad90ef157ee081f6b23963c1cf0b832a9a0e036ee7be968686": {
+      "peer_id": "0c0c721f08b7e5ad90ef157ee081f6b23963c1cf0b832a9a0e036ee7be968686",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 1.833691463117047,
+      "last_seen": "2026-04-30T19:43:58.283891+00:00"
+    },
+    "b95fefa10e4839327d9c9220f2a0d40810c253172adedfe4b2c3aca89dc052e3": {
+      "peer_id": "b95fefa10e4839327d9c9220f2a0d40810c253172adedfe4b2c3aca89dc052e3",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.0070182651578,
+      "last_seen": "2026-04-30T19:54:21.242781+00:00"
+    },
+    "72b84d8217c6fe37b8e39840cb083727ef5fdb86dac3cb7f15c2971dce31e439": {
+      "peer_id": "72b84d8217c6fe37b8e39840cb083727ef5fdb86dac3cb7f15c2971dce31e439",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 0.4268578091275121,
+      "last_seen": "2026-04-30T19:54:21.270012+00:00"
+    },
+    "97b69c706b41810d3e79ffa303c024303d8af8c34cff22efa07c95ba3f97b59c": {
+      "peer_id": "97b69c706b41810d3e79ffa303c024303d8af8c34cff22efa07c95ba3f97b59c",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 4.37467423510312,
+      "last_seen": "2026-05-02T12:36:30.756786+00:00"
+    },
+    "732b864b0bf47c4601c543ad7f2ae80934d68b109d3f3dca895285ed5216578a": {
+      "peer_id": "732b864b0bf47c4601c543ad7f2ae80934d68b109d3f3dca895285ed5216578a",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 5.284019458949245,
+      "last_seen": "2026-05-02T12:36:30.765798+00:00"
+    },
+    "9d89fefa1b11f4fc85b0bcea80b3648e085adaf783663856d74d023e053d0c7d": {
+      "peer_id": "9d89fefa1b11f4fc85b0bcea80b3648e085adaf783663856d74d023e053d0c7d",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 5.430554665423328,
+      "last_seen": "2026-05-02T12:36:30.771563+00:00"
+    },
+    "851214454539c7a45dd12ff08dd044dd25160f0f7d99b35f35b0dae2ac248b4f": {
+      "peer_id": "851214454539c7a45dd12ff08dd044dd25160f0f7d99b35f35b0dae2ac248b4f",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 2.1635999321220325,
+      "last_seen": "2026-05-02T12:36:30.776393+00:00"
+    },
+    "3b62ee01f6ad6848494bb0e7fec3e6e9943b3f3e7d69cdf73b92450d3b2e3082": {
+      "peer_id": "3b62ee01f6ad6848494bb0e7fec3e6e9943b3f3e7d69cdf73b92450d3b2e3082",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 4.1629777981905365,
+      "last_seen": "2026-05-02T12:36:30.782008+00:00"
+    },
+    "e7ddd9eaf6dc12ad24f7db36d839b108724f694eb2b84bd1de1c294bae8bff41": {
+      "peer_id": "e7ddd9eaf6dc12ad24f7db36d839b108724f694eb2b84bd1de1c294bae8bff41",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 1.213392487157544,
+      "last_seen": "2026-05-02T12:36:30.787193+00:00"
+    },
+    "4a2be3761a5a9b36b308caec27f25bd84281940c111cffa4c45ee3fdf57ddd1d": {
+      "peer_id": "4a2be3761a5a9b36b308caec27f25bd84281940c111cffa4c45ee3fdf57ddd1d",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 5.074171608583998,
+      "last_seen": "2026-05-02T12:15:05.350633+00:00"
+    },
+    "4d512a597ee83fb5f14da3af5faf463cd70918e1782ac56a8b3926a8154bab92": {
+      "peer_id": "4d512a597ee83fb5f14da3af5faf463cd70918e1782ac56a8b3926a8154bab92",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 1.6962216620334651,
+      "last_seen": "2026-05-02T12:15:05.356244+00:00"
+    },
+    "4fadf36df9e8b58dd3867a8d07ec6391b97b504ed5994296d74d1f5d6b089451": {
+      "peer_id": "4fadf36df9e8b58dd3867a8d07ec6391b97b504ed5994296d74d1f5d6b089451",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.023861615025353,
+      "last_seen": "2026-05-02T11:53:14.173889+00:00"
+    },
+    "c451cdf27ed54734d1d7e0a3e2e5bff57fb199c5759d12043f0c313ce84aaff4": {
+      "peer_id": "c451cdf27ed54734d1d7e0a3e2e5bff57fb199c5759d12043f0c313ce84aaff4",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.687052410630181,
+      "last_seen": "2026-05-02T11:53:14.179754+00:00"
+    },
+    "9fa55b84298fa9c059d4cb0b947407f96a63efdc5656144d7ac4e2a3c1fec25e": {
+      "peer_id": "9fa55b84298fa9c059d4cb0b947407f96a63efdc5656144d7ac4e2a3c1fec25e",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 0.8732128595481468,
+      "last_seen": "2026-05-02T12:39:33.649484+00:00"
+    },
+    "33ee693fd9a7d8c66febc891722db5d581ac37122402edd78289dc36b44d68e1": {
+      "peer_id": "33ee693fd9a7d8c66febc891722db5d581ac37122402edd78289dc36b44d68e1",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.064758434060965,
+      "last_seen": "2026-05-02T12:39:33.656713+00:00"
+    },
+    "9e3d0135d58417548347193d4e9adc55be1b43f3e0a6700b597d6e03a61e02a9": {
+      "peer_id": "9e3d0135d58417548347193d4e9adc55be1b43f3e0a6700b597d6e03a61e02a9",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 1.4751395135411292,
+      "last_seen": "2026-05-02T12:39:33.662298+00:00"
+    },
+    "4e1277cd1ddff3339ade06b2b32168431b2125966162fb966d123cb1ca25c330": {
+      "peer_id": "4e1277cd1ddff3339ade06b2b32168431b2125966162fb966d123cb1ca25c330",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 2.654108772436439,
+      "last_seen": "2026-05-02T12:39:33.668102+00:00"
+    },
+    "968b3aa3ac4f5b5bda84a39d00e201e2caa06aef50181e2daa4d7157e1d826fc": {
+      "peer_id": "968b3aa3ac4f5b5bda84a39d00e201e2caa06aef50181e2daa4d7157e1d826fc",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.306556364160201,
+      "last_seen": "2026-05-02T12:39:33.673665+00:00"
+    },
+    "6487074b72724783b5e6e0bae9d35397a6cad4648590ca5f4e7f240a0646eaf2": {
+      "peer_id": "6487074b72724783b5e6e0bae9d35397a6cad4648590ca5f4e7f240a0646eaf2",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 5.789911818012215,
+      "last_seen": "2026-05-02T12:39:33.679859+00:00"
+    },
+    "b9ea6e46fcc7f090165499150025660cfef95cca323b8c0eef4b1558cf2b6007": {
+      "peer_id": "b9ea6e46fcc7f090165499150025660cfef95cca323b8c0eef4b1558cf2b6007",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 0.5940099368169576,
+      "last_seen": "2026-05-02T12:39:33.687944+00:00"
+    },
+    "0bffad668f94888220e173b1762d9e6117f5085fe432273291e7e96f6d0150e9": {
+      "peer_id": "0bffad668f94888220e173b1762d9e6117f5085fe432273291e7e96f6d0150e9",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 5.235756255992255,
+      "last_seen": "2026-05-02T12:39:33.693798+00:00"
+    },
+    "1c216fd089e721e6c1c68459e11ebee002c68e8642273e80a6e2a6c5e3e60062": {
+      "peer_id": "1c216fd089e721e6c1c68459e11ebee002c68e8642273e80a6e2a6c5e3e60062",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.9434263260612985,
+      "last_seen": "2026-05-02T12:39:33.699072+00:00"
+    },
+    "ba4487aff2a1e28d96453f23b9b1ec11958755075fc33a7cb624ccf75dee201b": {
+      "peer_id": "ba4487aff2a1e28d96453f23b9b1ec11958755075fc33a7cb624ccf75dee201b",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 2.551138385713039,
+      "last_seen": "2026-05-02T12:39:33.705699+00:00"
+    },
+    "247198a9b445fffaee4f737b34354c492b460046b2aeb460e2b3908573020b43": {
+      "peer_id": "247198a9b445fffaee4f737b34354c492b460046b2aeb460e2b3908573020b43",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.418263217210867,
+      "last_seen": "2026-05-02T13:44:04.661883+00:00"
+    },
+    "9ff87ff05748c9d83b41df4438c7691c4759ed253e7af8de8f3ef0896e35d535": {
+      "peer_id": "9ff87ff05748c9d83b41df4438c7691c4759ed253e7af8de8f3ef0896e35d535",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.871897212937756,
+      "last_seen": "2026-05-02T13:44:04.669554+00:00"
+    },
+    "57d118db11de4c23326df26ca2d53503538b57bb407000bd12971a9d88baf93e": {
+      "peer_id": "57d118db11de4c23326df26ca2d53503538b57bb407000bd12971a9d88baf93e",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 6.257718598685498,
+      "last_seen": "2026-05-02T13:44:04.676775+00:00"
+    },
+    "75dc8ec0f95590a7330d445c8dcfdaab8e09b8b79c946dae9bac0c44e554e628": {
+      "peer_id": "75dc8ec0f95590a7330d445c8dcfdaab8e09b8b79c946dae9bac0c44e554e628",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 2.0043356204537233,
+      "last_seen": "2026-05-02T13:44:04.683586+00:00"
+    },
+    "a29d1cbb92dfd77a232530a401f9eacffe0e6f2ba031719b80ed2eeb40da4626": {
+      "peer_id": "a29d1cbb92dfd77a232530a401f9eacffe0e6f2ba031719b80ed2eeb40da4626",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 4.260929402377572,
+      "last_seen": "2026-05-02T15:21:50.274401+00:00"
+    },
+    "bfbab47b54ce11d241cfe116e4d54704d78ec697e5b6b144fb0a00cbbf115b0c": {
+      "peer_id": "bfbab47b54ce11d241cfe116e4d54704d78ec697e5b6b144fb0a00cbbf115b0c",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 2.4516410273188853,
+      "last_seen": "2026-05-02T15:21:50.282830+00:00"
+    },
+    "1c9b0821096fc350dc5e581b278f29edd4596a42b61138fedf2ebeae564ed7df": {
+      "peer_id": "1c9b0821096fc350dc5e581b278f29edd4596a42b61138fedf2ebeae564ed7df",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.116082949235454,
+      "last_seen": "2026-05-02T15:21:50.290483+00:00"
+    },
+    "8526454bc884c09769407bf0c10cddbe1971b22bf47f2de827828570cb5e7375": {
+      "peer_id": "8526454bc884c09769407bf0c10cddbe1971b22bf47f2de827828570cb5e7375",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 2.3747681881246505,
+      "last_seen": "2026-05-02T15:21:50.298712+00:00"
+    },
+    "9d9b3c61485cbd63f81440c6fb8ab2f6c166ddb24e08362c4a60251270db1923": {
+      "peer_id": "9d9b3c61485cbd63f81440c6fb8ab2f6c166ddb24e08362c4a60251270db1923",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 1.90033213548594,
+      "last_seen": "2026-05-02T15:21:50.306026+00:00"
+    },
+    "058ffd609d4222b6b86843390264c11d4d074c9eab312003d61c4d11afaea846": {
+      "peer_id": "058ffd609d4222b6b86843390264c11d4d074c9eab312003d61c4d11afaea846",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.248023307170975,
+      "last_seen": "2026-05-02T15:21:50.312641+00:00"
+    },
+    "74928d70bc962203dc72dabc5dcbe27317cade019e0596cc3a0310aaa43c6ba0": {
+      "peer_id": "74928d70bc962203dc72dabc5dcbe27317cade019e0596cc3a0310aaa43c6ba0",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 4.1644540525509175,
+      "last_seen": "2026-05-02T15:21:50.319705+00:00"
+    },
+    "2395c8236f31274ff969b543bc0b51785f1201b172b2269c7ebeb9e793dd4e0a": {
+      "peer_id": "2395c8236f31274ff969b543bc0b51785f1201b172b2269c7ebeb9e793dd4e0a",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 1.1053112809955432,
+      "last_seen": "2026-05-02T15:21:50.326344+00:00"
+    },
+    "80e38fd09599efb1cb644a8e336d815aa983497a275c4e33c9f2ab4f98de2e31": {
+      "peer_id": "80e38fd09599efb1cb644a8e336d815aa983497a275c4e33c9f2ab4f98de2e31",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 4.44675104675208,
+      "last_seen": "2026-05-02T15:21:50.333383+00:00"
+    },
+    "2320a63a1171db415a2c768c1611a87005adfc435d431fcaff8ba2b5e669c694": {
+      "peer_id": "2320a63a1171db415a2c768c1611a87005adfc435d431fcaff8ba2b5e669c694",
+      "role": "citizen",
+      "caps": [
+        "trade",
+        "chat"
+      ],
+      "angle_rad": 3.988672726062704,
+      "last_seen": "2026-05-02T15:21:50.340172+00:00"
     }
   },
-  "updated_at": "2026-04-30T19:34:43.226114+00:00"
+  "updated_at": "2026-05-02T15:21:50.340185+00:00"
 }

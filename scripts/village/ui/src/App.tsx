@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { GiniTimeseries } from './types';
 import GiniChart from './GiniChart';
 import ActionsTable from './ActionsTable';
+import WealthChart from './WealthChart';
+import BalanceChart from './BalanceChart';
+import TradeVolumeChart from './TradeVolumeChart';
+import ResourceChart from './ResourceChart';
+import PolicyChart from './PolicyChart';
 
 const API = '/api';
 
@@ -44,7 +49,7 @@ export default function App() {
 
   const [chartWidth, setChartWidth] = useState(800);
   const chartRef = useCallback((node: HTMLDivElement | null) => {
-    if (node) setChartWidth(node.clientWidth - 32);
+    if (node) setChartWidth(Math.floor((node.clientWidth - 32) / 2));
   }, []);
 
   return (
@@ -84,8 +89,13 @@ export default function App() {
             <span><strong style={{ color: '#888' }}>epochs</strong> {data.max_epochs}</span>
           </div>
 
-          <div ref={chartRef} style={chartCard}>
-            <GiniChart data={data} width={chartWidth} height={280} />
+          <div ref={chartRef} style={chartGrid}>
+            <div style={chartCard}><GiniChart data={data} width={chartWidth} height={240} /></div>
+            <div style={chartCard}><WealthChart data={data} width={chartWidth} height={240} /></div>
+            <div style={chartCard}><BalanceChart data={data} width={chartWidth} height={240} /></div>
+            <div style={chartCard}><TradeVolumeChart data={data} width={chartWidth} height={240} /></div>
+            <div style={chartCard}><PolicyChart data={data} width={chartWidth} height={240} /></div>
+            <div style={chartCard}><ResourceChart data={data} width={chartWidth} height={240} /></div>
           </div>
 
           <ActionsTable data={data} />
@@ -179,10 +189,16 @@ const metaBar: React.CSSProperties = {
   border: '1px solid #222',
 };
 
+const chartGrid: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 16,
+  marginBottom: 28,
+};
+
 const chartCard: React.CSSProperties = {
   background: '#111',
   borderRadius: 8,
   padding: 20,
-  marginBottom: 28,
   border: '1px solid #222',
 };
